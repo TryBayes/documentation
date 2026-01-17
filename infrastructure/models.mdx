@@ -1,0 +1,281 @@
+---
+title: Models & Gateway
+description: "Configure LLM providers for agent execution"
+---
+
+Helios supports multiple LLM providers through a unified Gateway interface. The gateway automatically routes requests to the appropriate backend based on the model identifier.
+
+## Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="Google Gemini" icon="google">
+    Default provider with computer-use models
+  </Card>
+  <Card title="Anthropic" icon="a">
+    Claude models via direct API
+  </Card>
+  <Card title="AWS Bedrock" icon="aws">
+    Claude models via AWS
+  </Card>
+  <Card title="OpenAI" icon="robot">
+    GPT models with computer-use preview
+  </Card>
+</CardGroup>
+
+## Model Selection
+
+Specify a model with the `-m` flag:
+
+```bash
+helios tasks/my-task -m <model-identifier>
+```
+
+### Routing Rules
+
+The gateway uses these patterns to route to providers:
+
+| Pattern | Provider |
+|---------|----------|
+| `gemini/*` or contains `gemini` | Google Gemini |
+| `claude-*` (e.g., `claude-sonnet-4-20250514`) | Anthropic Direct |
+| `bedrock/*` or contains `anthropic.` | AWS Bedrock |
+| `openai/*` or `computer-use-preview` | OpenAI |
+
+## Available Models
+
+### Google Gemini
+
+<Tabs>
+  <Tab title="Models">
+    | Model ID | Description |
+    |----------|-------------|
+    | `gemini/gemini-2.5-computer-use-preview-10-2025` | Computer-use preview (default) |
+    | `gemini/gemini-3-pro-preview` | Gemini 3 Pro |
+  </Tab>
+  <Tab title="Usage">
+    ```bash
+    # Default (Gemini)
+    helios tasks/my-task
+
+    # Explicit
+    helios tasks/my-task -m gemini/gemini-2.5-computer-use-preview-10-2025
+    ```
+  </Tab>
+  <Tab title="API Key">
+    ```bash
+    export GEMINI_API_KEY=your-api-key
+    # or
+    export GOOGLE_API_KEY=your-api-key
+    ```
+  </Tab>
+</Tabs>
+
+### Anthropic (Direct)
+
+<Tabs>
+  <Tab title="Models">
+    | Model ID | Description |
+    |----------|-------------|
+    | `claude-sonnet-4-20250514` | Claude Sonnet 4 |
+    | `claude-opus-4-20250514` | Claude Opus 4 |
+  </Tab>
+  <Tab title="Usage">
+    ```bash
+    helios tasks/my-task -m claude-sonnet-4-20250514
+    helios tasks/my-task -m claude-opus-4-20250514
+    ```
+  </Tab>
+  <Tab title="API Key">
+    ```bash
+    export ANTHROPIC_API_KEY=your-api-key
+    ```
+  </Tab>
+</Tabs>
+
+### AWS Bedrock
+
+<Tabs>
+  <Tab title="Models">
+    | Model ID | Description |
+    |----------|-------------|
+    | `bedrock/global.anthropic.claude-sonnet-4-20250514-v1:0` | Claude Sonnet via Bedrock |
+    | `bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0` | Claude Opus via Bedrock |
+  </Tab>
+  <Tab title="Usage">
+    ```bash
+    helios tasks/my-task -m bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0
+    ```
+  </Tab>
+  <Tab title="Credentials">
+    ```bash
+    export AWS_ACCESS_KEY_ID=your-access-key
+    export AWS_SECRET_ACCESS_KEY=your-secret-key
+    export AWS_REGION=us-east-1
+    ```
+  </Tab>
+</Tabs>
+
+### OpenAI
+
+<Tabs>
+  <Tab title="Models">
+    | Model ID | Description |
+    |----------|-------------|
+    | `openai/computer-use-preview` | Computer-use preview |
+  </Tab>
+  <Tab title="Usage">
+    ```bash
+    helios tasks/my-task -m openai/computer-use-preview
+    ```
+  </Tab>
+  <Tab title="API Key">
+    ```bash
+    export OPENAI_API_KEY=your-api-key
+    ```
+  </Tab>
+</Tabs>
+
+## Environment Variables
+
+Set these in your shell or `.env` file:
+
+```bash
+# Google Gemini (default provider)
+export GEMINI_API_KEY=your-gemini-api-key
+# or
+export GOOGLE_API_KEY=your-google-api-key
+
+# Anthropic Direct
+export ANTHROPIC_API_KEY=your-anthropic-api-key
+
+# AWS Bedrock
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_REGION=us-east-1
+
+# OpenAI
+export OPENAI_API_KEY=your-openai-api-key
+```
+
+### Using .env Files
+
+Create a `.env` file in your project root:
+
+```bash
+# .env
+GEMINI_API_KEY=your-key-here
+ANTHROPIC_API_KEY=your-key-here
+OPENAI_API_KEY=your-key-here
+```
+
+<Warning>
+Never commit `.env` files to version control. Add `.env` to your `.gitignore`.
+</Warning>
+
+## Model Comparison
+
+| Provider | Strengths | Best For |
+|----------|-----------|----------|
+| **Gemini** | Fast, good vision | General tasks, quick iteration |
+| **Claude Sonnet** | Balanced performance | Most tasks, good default |
+| **Claude Opus** | Best reasoning | Complex tasks, hard problems |
+| **OpenAI** | Wide availability | OpenAI-native workflows |
+
+## Batch Execution with Models
+
+Specify the model for batch runs:
+
+```bash
+helios batch tasks/ -n 4 -m claude-sonnet-4-20250514
+```
+
+All tasks in the batch will use the specified model.
+
+### Comparing Models
+
+Run the same tasks with different models:
+
+```bash
+# Run with Gemini
+helios batch tasks/benchmark/ -n 4 -o results/gemini/
+
+# Run with Claude
+helios batch tasks/benchmark/ -n 4 -m claude-sonnet-4-20250514 -o results/claude/
+
+# Run with OpenAI
+helios batch tasks/benchmark/ -n 4 -m openai/computer-use-preview -o results/openai/
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API key not found">
+    Check that your environment variable is set:
+
+    ```bash
+    echo $ANTHROPIC_API_KEY
+    ```
+
+    If empty, export it:
+
+    ```bash
+    export ANTHROPIC_API_KEY=your-key
+    ```
+  </Accordion>
+  <Accordion title="Model not found">
+    Verify the model identifier matches a supported pattern:
+
+    ```bash
+    # Correct
+    helios tasks/my-task -m claude-sonnet-4-20250514
+
+    # Wrong
+    helios tasks/my-task -m claude4-sonnet
+    ```
+  </Accordion>
+  <Accordion title="Rate limiting">
+    If you hit rate limits, reduce concurrency in batch mode:
+
+    ```bash
+    helios batch tasks/ -n 2  # Lower concurrency
+    ```
+  </Accordion>
+  <Accordion title="Bedrock permission errors">
+    Ensure your AWS IAM user/role has Bedrock permissions:
+    - `bedrock:InvokeModel`
+    - `bedrock:InvokeModelWithResponseStream`
+  </Accordion>
+</AccordionGroup>
+
+## Debugging
+
+Enable debug logging to see gateway details:
+
+```bash
+export CUA_LOG_LEVEL=DEBUG
+helios tasks/my-task -m claude-sonnet-4-20250514
+```
+
+This shows:
+- Model routing decisions
+- API request/response details
+- Token usage
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Environments"
+    icon="docker"
+    href="/infrastructure/environments"
+  >
+    Configure Docker containers
+  </Card>
+  <Card
+    title="Daytona Cloud"
+    icon="cloud"
+    href="/infrastructure/daytona"
+  >
+    Run tasks in the cloud
+  </Card>
+</CardGroup>

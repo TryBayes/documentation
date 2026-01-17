@@ -1,0 +1,303 @@
+---
+title: AgentRunner
+description: "Execute single tasks programmatically"
+---
+
+The `AgentRunner` class is the primary interface for executing individual tasks.
+
+## Basic Usage
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def main():
+    runner = AgentRunner(
+        task_path="tasks/create-hello-file",
+        model="claude-sonnet-4-20250514"
+    )
+
+    result = await runner.run()
+    print(f"Result: {result.reward}")
+
+asyncio.run(main())
+```
+
+## Constructor
+
+```python
+AgentRunner(
+    task_path: str | Path,
+    model: str = "gemini/gemini-2.5-computer-use-preview-10-2025",
+    provider: str = "docker",
+    output_dir: str | Path = "output",
+    watch: bool = False
+)
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `task_path` | `str \| Path` | Required | Path to task directory |
+| `model` | `str` | Gemini default | Model identifier |
+| `provider` | `str` | `"docker"` | Environment provider |
+| `output_dir` | `str \| Path` | `"output"` | Where to save outputs |
+| `watch` | `bool` | `False` | Enable web viewer |
+
+## Methods
+
+### run()
+
+Execute the task and return results.
+
+```python
+async def run(self) -> RunResult
+```
+
+**Returns:** `RunResult` with execution details
+
+**Example:**
+```python
+result = await runner.run()
+
+if result.success:
+    print("Task passed!")
+else:
+    print(f"Task failed: {result.error}")
+```
+
+## RunResult
+
+The result object returned by `run()`.
+
+```python
+@dataclass
+class RunResult:
+    success: bool           # Whether the task passed (reward >= 1.0)
+    reward: float           # Reward value from verification
+    duration: float         # Execution time in seconds
+    trajectory: list        # List of execution steps
+    error: str | None       # Error message if failed
+    output_dir: Path        # Where outputs were saved
+```
+
+### Accessing the Trajectory
+
+```python
+result = await runner.run()
+
+for step in result.trajectory:
+    print(f"Tool: {step.tool_name}")
+    print(f"Input: {step.tool_input}")
+    print(f"Output: {step.tool_output}")
+    print("---")
+```
+
+## Examples
+
+### Basic Task Execution
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def run_task():
+    runner = AgentRunner(
+        task_path="tasks/create-hello-file",
+        model="claude-sonnet-4-20250514"
+    )
+
+    result = await runner.run()
+
+    print(f"Success: {result.success}")
+    print(f"Reward: {result.reward}")
+    print(f"Duration: {result.duration:.1f}s")
+
+asyncio.run(run_task())
+```
+
+### With Web Viewer
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def run_with_viewer():
+    runner = AgentRunner(
+        task_path="tasks/explore-desktop",
+        model="claude-sonnet-4-20250514",
+        watch=True  # Start web viewer
+    )
+
+    # Viewer available at http://localhost:8080
+    result = await runner.run()
+
+asyncio.run(run_with_viewer())
+```
+
+### Using Daytona
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def run_in_cloud():
+    runner = AgentRunner(
+        task_path="tasks/gui-task",
+        model="claude-sonnet-4-20250514",
+        provider="daytona"
+    )
+
+    result = await runner.run()
+    print(f"Cloud execution result: {result.reward}")
+
+asyncio.run(run_in_cloud())
+```
+
+### Error Handling
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def run_with_error_handling():
+    runner = AgentRunner(
+        task_path="tasks/my-task",
+        model="claude-sonnet-4-20250514"
+    )
+
+    try:
+        result = await runner.run()
+
+        if result.success:
+            print("Task completed successfully")
+        else:
+            print(f"Task failed with reward: {result.reward}")
+            if result.error:
+                print(f"Error: {result.error}")
+
+    except Exception as e:
+        print(f"Execution error: {e}")
+
+asyncio.run(run_with_error_handling())
+```
+
+### Saving Results
+
+```python
+import asyncio
+import json
+from helios import AgentRunner
+
+async def run_and_save():
+    runner = AgentRunner(
+        task_path="tasks/my-task",
+        model="claude-sonnet-4-20250514",
+        output_dir="results/experiment-1"
+    )
+
+    result = await runner.run()
+
+    # Results are automatically saved to output_dir
+    # Additional custom processing:
+    summary = {
+        "success": result.success,
+        "reward": result.reward,
+        "duration": result.duration,
+        "steps": len(result.trajectory)
+    }
+
+    with open(result.output_dir / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
+asyncio.run(run_and_save())
+```
+
+### Multiple Models
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def compare_models():
+    task_path = "tasks/create-hello-file"
+    models = [
+        "gemini/gemini-2.5-computer-use-preview-10-2025",
+        "claude-sonnet-4-20250514",
+        "openai/computer-use-preview"
+    ]
+
+    results = {}
+
+    for model in models:
+        runner = AgentRunner(
+            task_path=task_path,
+            model=model,
+            output_dir=f"results/{model.replace('/', '_')}"
+        )
+
+        result = await runner.run()
+        results[model] = result.reward
+
+    print("Results by model:")
+    for model, reward in results.items():
+        print(f"  {model}: {reward}")
+
+asyncio.run(compare_models())
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always use async/await">
+    AgentRunner is async-only. Use `asyncio.run()` for scripts:
+
+    ```python
+    import asyncio
+
+    async def main():
+        # Your code here
+        pass
+
+    asyncio.run(main())
+    ```
+  </Accordion>
+  <Accordion title="Handle errors gracefully">
+    Always check `result.success` and handle failures:
+
+    ```python
+    result = await runner.run()
+    if not result.success:
+        logger.error(f"Task failed: {result.error}")
+    ```
+  </Accordion>
+  <Accordion title="Use meaningful output directories">
+    Organize outputs by experiment or timestamp:
+
+    ```python
+    from datetime import datetime
+
+    output_dir = f"results/{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="ParallelRunner"
+    icon="layer-group"
+    href="/api-reference/parallel"
+  >
+    Run multiple tasks concurrently
+  </Card>
+  <Card
+    title="CLI Reference"
+    icon="terminal"
+    href="/reference/cli"
+  >
+    Command-line interface
+  </Card>
+</CardGroup>

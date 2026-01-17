@@ -1,0 +1,224 @@
+---
+title: API Overview
+description: "Use Helios programmatically in your Python applications"
+---
+
+Helios can be used as a Python library for custom workflows, CI/CD integration, and building agent applications.
+
+## Installation
+
+```bash
+pip install helios
+# or
+uv pip install helios
+```
+
+## Quick Start
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def main():
+    runner = AgentRunner(
+        task_path="tasks/create-hello-file",
+        model="claude-sonnet-4-20250514"
+    )
+
+    result = await runner.run()
+
+    print(f"Status: {'PASS' if result.success else 'FAIL'}")
+    print(f"Reward: {result.reward}")
+    print(f"Duration: {result.duration:.1f}s")
+
+asyncio.run(main())
+```
+
+## Core Classes
+
+<CardGroup cols={2}>
+  <Card
+    title="AgentRunner"
+    icon="play"
+    href="/api-reference/runner"
+  >
+    Execute single tasks
+  </Card>
+  <Card
+    title="ParallelRunner"
+    icon="layer-group"
+    href="/api-reference/parallel"
+  >
+    Run tasks concurrently
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Run a Task and Check Result
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def run_task():
+    runner = AgentRunner(
+        task_path="tasks/my-task",
+        model="claude-sonnet-4-20250514"
+    )
+
+    result = await runner.run()
+
+    if result.success:
+        print("Task completed successfully!")
+    else:
+        print(f"Task failed with reward: {result.reward}")
+
+asyncio.run(run_task())
+```
+
+### Run Multiple Tasks in Parallel
+
+```python
+import asyncio
+from helios import ParallelRunner, discover_tasks
+
+async def run_benchmark():
+    task_paths = discover_tasks("tasks/benchmark/")
+
+    runner = ParallelRunner(
+        task_paths=task_paths,
+        n_concurrent=4,
+        model="claude-sonnet-4-20250514",
+        output_dir="results/"
+    )
+
+    result = await runner.run()
+
+    print(f"Passed: {result.passed}/{result.total_tasks}")
+    print(f"Mean reward: {result.mean_reward:.3f}")
+
+asyncio.run(run_benchmark())
+```
+
+### Custom Task Discovery
+
+```python
+from pathlib import Path
+from helios import ParallelRunner
+
+# Select specific tasks
+task_paths = [
+    Path("tasks/easy-task"),
+    Path("tasks/medium-task"),
+    Path("tasks/hard-task"),
+]
+
+runner = ParallelRunner(
+    task_paths=task_paths,
+    n_concurrent=3,
+    model="claude-sonnet-4-20250514"
+)
+```
+
+### Using Different Providers
+
+```python
+from helios import AgentRunner
+
+# Local Docker
+runner = AgentRunner(
+    task_path="tasks/my-task",
+    model="claude-sonnet-4-20250514",
+    provider="docker"
+)
+
+# Daytona Cloud
+runner = AgentRunner(
+    task_path="tasks/my-task",
+    model="claude-sonnet-4-20250514",
+    provider="daytona"
+)
+```
+
+### Accessing Trajectory
+
+```python
+import asyncio
+from helios import AgentRunner
+
+async def analyze_execution():
+    runner = AgentRunner(
+        task_path="tasks/my-task",
+        model="claude-sonnet-4-20250514",
+        output_dir="output/"
+    )
+
+    result = await runner.run()
+
+    # Access the trajectory
+    for step in result.trajectory:
+        print(f"Step {step.index}: {step.tool_name}")
+        print(f"  Input: {step.tool_input}")
+        print(f"  Output: {step.tool_output[:100]}...")
+
+asyncio.run(analyze_execution())
+```
+
+## Type Definitions
+
+### RunResult
+
+```python
+@dataclass
+class RunResult:
+    success: bool           # Whether the task passed
+    reward: float           # Reward value (0.0 - 1.0)
+    duration: float         # Execution time in seconds
+    trajectory: list        # List of execution steps
+    error: str | None       # Error message if failed
+```
+
+### BatchResult
+
+```python
+@dataclass
+class BatchResult:
+    total_tasks: int        # Number of tasks run
+    passed: int             # Number of tasks passed
+    failed: int             # Number of tasks failed
+    mean_reward: float      # Average reward
+    duration: float         # Total execution time
+    tasks: list[TaskResult] # Individual task results
+```
+
+### TaskResult
+
+```python
+@dataclass
+class TaskResult:
+    name: str               # Task name
+    status: str             # "passed" or "failed"
+    reward: float           # Reward value
+    duration: float         # Execution time
+    error: str | None       # Error message if failed
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="AgentRunner"
+    icon="play"
+    href="/api-reference/runner"
+  >
+    Detailed AgentRunner API
+  </Card>
+  <Card
+    title="ParallelRunner"
+    icon="layer-group"
+    href="/api-reference/parallel"
+  >
+    Detailed ParallelRunner API
+  </Card>
+</CardGroup>

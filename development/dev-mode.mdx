@@ -1,0 +1,102 @@
+---
+title: Dev Mode
+description: "Test the web viewer without LLM costs"
+---
+
+Dev mode runs the web viewer with mock data, allowing UI development and testing without consuming LLM API credits.
+
+## Usage
+
+```bash
+helios dev
+```
+
+Then open [http://localhost:8080](http://localhost:8080) in your browser.
+
+## What It Does
+
+Dev mode starts the web viewer server with simulated:
+- Agent messages and reasoning
+- Tool calls and outputs
+- Screenshots
+- Progress updates
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="UI Development" icon="paintbrush">
+    Iterate on the web viewer interface without API costs
+  </Card>
+  <Card title="Testing" icon="flask">
+    Verify trace rendering and WebSocket connections
+  </Card>
+  <Card title="Offline Work" icon="wifi-slash">
+    Work without internet or API credentials
+  </Card>
+  <Card title="Demos" icon="presentation">
+    Show the viewer without running real tasks
+  </Card>
+</CardGroup>
+
+## Mock Data
+
+Dev mode simulates a typical agent session:
+
+```
+[Agent] Analyzing the task requirements...
+[Tool] bash: echo "Hello World" > /home/hello.txt
+[Result] Command executed successfully
+[Agent] File created. Verifying...
+[Tool] bash: cat /home/hello.txt
+[Result] Hello World
+[Agent] Task completed successfully.
+```
+
+## Customizing Mock Data
+
+For custom mock traces, modify the dev mode implementation in `src/helios/server/app.py`.
+
+## Web Viewer Development
+
+The web viewer frontend is located at:
+
+```
+src/helios/server/helios-viewer/
+├── src/
+│   ├── App.tsx
+│   ├── components/
+│   └── ...
+├── package.json
+└── ...
+```
+
+### Running the Frontend Separately
+
+For hot-reload during frontend development:
+
+```bash
+cd src/helios/server/helios-viewer
+npm install
+npm run dev
+```
+
+This starts a Vite dev server with hot module replacement.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Web Viewer"
+    icon="eye"
+    href="/execution/web-viewer"
+  >
+    Using the web viewer with real tasks
+  </Card>
+  <Card
+    title="Contributing"
+    icon="code-pull-request"
+    href="/development/contributing"
+  >
+    Contribute to Helios development
+  </Card>
+</CardGroup>

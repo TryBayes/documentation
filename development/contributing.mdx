@@ -1,0 +1,277 @@
+---
+title: Contributing
+description: "Contribute to Helios development"
+---
+
+We welcome contributions to Helios. This guide covers the development workflow.
+
+## Getting Started
+
+<Steps>
+  <Step title="Fork and clone">
+    ```bash
+    git clone https://github.com/YOUR-USERNAME/helios.git
+    cd helios
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    uv sync
+    ```
+  </Step>
+  <Step title="Run tests">
+    ```bash
+    uv run pytest tests/ -v
+    ```
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### Running Tests
+
+```bash
+# All unit tests
+uv run pytest tests/ -v
+
+# Specific test file
+uv run pytest tests/test_task.py -v
+
+# With coverage
+uv run pytest tests/ --cov=src/helios --cov-report=term-missing
+```
+
+### Integration Tests
+
+Integration tests require Docker and built images:
+
+```bash
+# Build required images
+docker build -t cua-desktop -f docker/Dockerfile.desktop .
+docker build -t click-test -f tasks/click-test/environment/Dockerfile tasks/click-test/environment/
+
+# Run integration tests
+uv run pytest tests/integration/ -v --run-integration -m "integration"
+```
+
+### Linting
+
+```bash
+# Check for issues
+uv run ruff check src/
+
+# Auto-fix issues
+uv run ruff check --fix src/
+```
+
+### Type Checking
+
+```bash
+uv run pyright src/
+```
+
+## Code Style
+
+### General Guidelines
+
+- Use type hints for all function signatures
+- Write docstrings for public functions and classes
+- Keep functions focused and small
+- Use meaningful variable names
+
+### Logging
+
+Always use the logger, never `print()`:
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+def my_function():
+    logger.debug("Detailed debug info")
+    logger.info("General info message")
+    logger.warning("Warning message")
+    logger.error("Error message")
+```
+
+### Exception Handling
+
+Add debug logging to exception handlers:
+
+```python
+try:
+    do_something()
+except SomeException as e:
+    logger.debug(f"Operation failed: {e}")
+    raise
+```
+
+### Abstract Methods
+
+Use ellipsis (`...`) not `pass` in abstract method bodies:
+
+```python
+from abc import ABC, abstractmethod
+
+class BaseClass(ABC):
+    @abstractmethod
+    def my_method(self) -> None:
+        ...  # Not 'pass'
+```
+
+## Project Structure
+
+Key areas for contribution:
+
+| Area | Location | Description |
+|------|----------|-------------|
+| Core runtime | `src/helios/runner.py` | Task execution |
+| LLM providers | `src/helios/gateway/` | Add new LLM backends |
+| Environments | `src/helios/environment/` | Container management |
+| Tools | `src/helios/tools/` | Agent capabilities |
+| Web viewer | `src/helios/server/` | Real-time UI |
+
+## Adding a New LLM Provider
+
+<Steps>
+  <Step title="Create gateway implementation">
+    Create `src/helios/gateway/newprovider.py`:
+
+    ```python
+    from .base import BaseGateway
+
+    class NewProviderGateway(BaseGateway):
+        async def send_message(self, messages, tools):
+            # Implementation
+            ...
+    ```
+  </Step>
+  <Step title="Update factory">
+    Add routing in `src/helios/gateway/factory.py`:
+
+    ```python
+    if model.startswith("newprovider/"):
+        return NewProviderGateway(model)
+    ```
+  </Step>
+  <Step title="Add tool implementations">
+    Create provider-specific tools in `src/helios/tools/newprovider/`.
+  </Step>
+  <Step title="Add tests">
+    Create tests in `tests/test_newprovider.py`.
+  </Step>
+</Steps>
+
+## Adding a New Environment Provider
+
+<Steps>
+  <Step title="Create environment implementation">
+    Create `src/helios/environment/newenv.py`:
+
+    ```python
+    from .base import Environment
+
+    class NewEnvironment(Environment):
+        async def start(self):
+            ...
+
+        async def execute(self, command: str) -> str:
+            ...
+
+        async def screenshot(self) -> bytes:
+            ...
+
+        async def stop(self):
+            ...
+    ```
+  </Step>
+  <Step title="Update factory">
+    Add to `src/helios/environment/factory.py`:
+
+    ```python
+    if provider == "newenv":
+        return NewEnvironment(config)
+    ```
+  </Step>
+  <Step title="Add tests">
+    Create tests in `tests/test_newenv.py`.
+  </Step>
+</Steps>
+
+## Pull Request Process
+
+<Steps>
+  <Step title="Create a branch">
+    ```bash
+    git checkout -b feature/my-feature
+    ```
+  </Step>
+  <Step title="Make changes">
+    Write code, add tests, update documentation.
+  </Step>
+  <Step title="Run all checks">
+    ```bash
+    uv run pytest tests/ -v
+    uv run ruff check src/
+    uv run pyright src/
+    ```
+  </Step>
+  <Step title="Commit with clear message">
+    ```bash
+    git commit -m "Add support for new feature X"
+    ```
+  </Step>
+  <Step title="Push and create PR">
+    ```bash
+    git push origin feature/my-feature
+    ```
+    Then create a pull request on GitHub.
+  </Step>
+</Steps>
+
+## Testing Your Changes
+
+Before submitting:
+
+1. **Unit tests pass**: `uv run pytest tests/ -v`
+2. **Linting passes**: `uv run ruff check src/`
+3. **Types check**: `uv run pyright src/`
+4. **Manual testing**: Run a real task with your changes
+
+### Testing with Real Tasks
+
+```bash
+# Run a simple task
+uv run helios tasks/create-hello-file
+
+# Run with your changes visible
+uv run helios tasks/explore-desktop --watch
+```
+
+## Documentation
+
+Documentation lives in `docs/` and uses Mintlify.
+
+### Local Preview
+
+```bash
+npm install -g mintlify
+mintlify dev docs
+```
+
+### Adding Documentation
+
+1. Create `.mdx` files in the appropriate directory
+2. Update `mint.json` navigation
+3. Use Mintlify components (Cards, Tabs, Accordions, etc.)
+
+## Getting Help
+
+- Open an issue on GitHub
+- Check existing issues for similar problems
+- Include reproduction steps and logs
+
+## License
+
+Contributions are licensed under Apache 2.0.

@@ -1,0 +1,227 @@
+---
+title: CLI Reference
+description: "Complete command-line interface documentation"
+---
+
+The `helios` CLI is the primary interface for running tasks.
+
+## Commands
+
+### helios (run)
+
+Run a single task.
+
+```bash
+helios [OPTIONS] TASK_PATH
+```
+
+**Arguments:**
+| Argument | Description |
+|----------|-------------|
+| `TASK_PATH` | Path to the task directory |
+
+**Options:**
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--watch` | | `false` | Start web viewer at localhost:8080 |
+| `--port` | `-p` | `8080` | Port to run the web viewer on (when using --watch) |
+| `--model` | `-m` | Gemini | Model identifier |
+| `--interactive` | `-i` | `false` | Enable pause/resume with 'p' key |
+| `--n-attempts` | `-k` | `1` | Number of attempts (for pass@k evaluation) |
+| `--output` | `-o` | `output` | Output directory |
+| `--provider` | | `docker` | Environment: `docker` or `daytona` |
+
+**Examples:**
+```bash
+# Basic run
+helios tasks/create-hello-file
+
+# With web viewer
+helios tasks/explore-desktop --watch
+
+# With web viewer on custom port
+helios tasks/explore-desktop --watch --port 3000
+
+# With specific model
+helios tasks/my-task -m claude-sonnet-4-20250514
+
+# Interactive mode
+helios tasks/my-task -i
+
+# pass@k: run 3 times, pass if any attempt succeeds
+helios tasks/my-task -k 3
+
+# Custom output directory
+helios tasks/my-task -o results/experiment-1/
+
+# Using Daytona
+helios tasks/my-task --provider daytona
+```
+
+### helios batch
+
+Run multiple tasks in parallel.
+
+```bash
+helios batch [OPTIONS] DIRECTORY
+```
+
+**Arguments:**
+| Argument | Description |
+|----------|-------------|
+| `DIRECTORY` | Directory containing tasks |
+
+**Options:**
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--concurrent` | `-n` | `2` | Number of concurrent tasks |
+| `--n-attempts` | `-k` | `1` | Number of attempts per task (for pass@k) |
+| `--model` | `-m` | Gemini | Model identifier |
+| `--output` | `-o` | `output` | Output directory |
+| `--quiet` | `-q` | `false` | Show only aggregate progress |
+| `--pattern` | `-p` | `**/task.toml` | Glob pattern for finding tasks |
+| `--provider` | | `docker` | Environment: `docker` or `daytona` |
+
+**Examples:**
+```bash
+# Basic batch
+helios batch tasks/ -n 4
+
+# With model selection
+helios batch tasks/ -n 4 -m claude-sonnet-4-20250514
+
+# pass@k evaluation: run each task 3 times
+helios batch tasks/ -n 4 -k 3
+
+# Custom output
+helios batch tasks/ -n 4 -o results/run-001/
+
+# Quiet mode
+helios batch tasks/ -n 4 --quiet
+
+# Custom pattern
+helios batch tasks/pdfbench/ -p "**/pdfbench_eyemed*/task.toml"
+
+# High concurrency with Daytona
+helios batch tasks/ -n 20 --provider daytona
+```
+
+### helios dev
+
+Run in development mode with mock data.
+
+```bash
+helios dev
+```
+
+This starts the web viewer with mock traces for UI development without LLM costs.
+
+## Environment Variables
+
+### LLM Providers
+
+```bash
+# Google Gemini (default)
+GEMINI_API_KEY=your-key
+# or
+GOOGLE_API_KEY=your-key
+
+# Anthropic
+ANTHROPIC_API_KEY=your-key
+
+# OpenAI
+OPENAI_API_KEY=your-key
+
+# AWS Bedrock
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+AWS_REGION=us-east-1
+```
+
+### Cloud Providers
+
+```bash
+# Daytona
+DAYTONA_API_KEY=your-key
+```
+
+### Debugging
+
+```bash
+# Log level
+CUA_LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
+```
+
+## Model Identifiers
+
+| Provider | Model ID |
+|----------|----------|
+| Gemini | `gemini/gemini-2.5-computer-use-preview-10-2025` |
+| Anthropic | `claude-sonnet-4-20250514` |
+| Anthropic | `claude-opus-4-20250514` |
+| Bedrock | `bedrock/global.anthropic.claude-sonnet-4-20250514-v1:0` |
+| Bedrock | `bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0` |
+| OpenAI | `openai/computer-use-preview` |
+
+## Output Structure
+
+### Single Task
+
+```
+output/task-name_20250101_120000/
+├── agent/
+│   ├── trajectory.json      # Complete execution trace (ATIF)
+│   └── screenshots/
+├── verifier/
+├── config.json
+└── result.json
+```
+
+### Batch
+
+```
+output/batch_20250101_120000/
+├── batch_summary.json
+├── 001_task-1/
+│   ├── agent/
+│   │   └── trajectory.json
+│   ├── verifier/
+│   ├── config.json
+│   └── result.json
+├── 002_task-2/
+│   ├── agent/
+│   │   └── trajectory.json
+│   ├── verifier/
+│   ├── config.json
+│   └── result.json
+└── ...
+```
+
+For `-k` runs, each task folder includes `attempt_001/`, `attempt_002/`, etc.
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success (all tasks passed) |
+| `1` | Failure (one or more tasks failed) |
+| `2` | Error (execution error) |
+
+## Tips
+
+<AccordionGroup>
+  <Accordion title="Use --watch for debugging">
+    The web viewer shows real-time execution. Essential for GUI tasks.
+  </Accordion>
+  <Accordion title="Start with low concurrency">
+    Begin with `-n 2` and increase based on system resources.
+  </Accordion>
+  <Accordion title="Use interactive mode for investigation">
+    Press 'p' to pause and inspect agent state with `-i`.
+  </Accordion>
+  <Accordion title="Organize outputs by date">
+    ```bash
+    helios batch tasks/ -n 4 -o results/$(date +%Y%m%d)/
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,302 @@
+---
+title: Running Tasks
+description: "Execute tasks with the Helios CLI"
+---
+
+This guide covers all the ways to run tasks with Helios, from single task execution to interactive debugging.
+
+## Basic Execution
+
+Run a task by specifying its directory path:
+
+```bash
+helios tasks/create-hello-file
+```
+
+The output shows agent progress and the final result:
+
+```
+Task: create-hello-file
+Model: gemini/gemini-2.5-computer-use-preview-10-2025
+Provider: docker
+
+[Agent] Analyzing task...
+[Tool] bash: echo "Hello World" > /home/hello.txt
+[Agent] Task completed.
+[Verify] Running test.sh...
+[Result] PASS (reward: 1.0)
+
+Duration: 12.3s
+Output: output/create-hello-file/
+```
+
+## With Web Viewer
+
+Add `--watch` to open the real-time web viewer:
+
+```bash
+helios tasks/explore-desktop --watch
+```
+
+Then navigate to [http://localhost:8080](http://localhost:8080) in your browser.
+
+<Info>
+The web viewer is especially useful for GUI tasks where you can watch the agent interact with the desktop in real-time via VNC.
+</Info>
+
+## Selecting Models
+
+Specify a different model with `-m` or `--model`:
+
+```bash
+# Use Claude Sonnet
+helios tasks/my-task -m claude-sonnet-4-20250514
+
+# Use Claude Opus via Bedrock
+helios tasks/my-task -m bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0
+
+# Use OpenAI
+helios tasks/my-task -m openai/computer-use-preview
+
+# Use Gemini (default)
+helios tasks/my-task -m gemini/gemini-2.5-computer-use-preview-10-2025
+```
+
+<Card
+  title="Model Configuration"
+  icon="gear"
+  href="/infrastructure/models"
+>
+  See all supported models and required API keys
+</Card>
+
+## Interactive Mode
+
+Enable interactive mode to pause and resume execution:
+
+```bash
+helios tasks/my-task -i
+```
+
+| Key | Action |
+|-----|--------|
+| `p` | Pause/Resume execution |
+
+This is useful for:
+- Debugging agent behavior
+- Inspecting intermediate state
+- Understanding agent decision-making
+
+## Output Directory
+
+Specify where to save execution outputs:
+
+```bash
+helios tasks/my-task -o results/experiment-1/
+```
+
+The output directory contains a run folder per execution, for example:
+
+```
+output/<task_name>_<timestamp>/
+├── agent/
+│   ├── trajectory.json      # Complete execution trace (ATIF)
+│   └── screenshots/
+├── verifier/
+├── config.json
+└── result.json
+```
+
+See the full schema in the [Trajectory Format](/reference/trajectory-format) doc.
+
+## Environment Providers
+
+Choose between local Docker or cloud execution:
+
+```bash
+# Local Docker (default)
+helios tasks/my-task --provider docker
+
+# Daytona cloud sandboxes
+helios tasks/my-task --provider daytona
+```
+
+<Card
+  title="Daytona Configuration"
+  icon="cloud"
+  href="/infrastructure/daytona"
+>
+  Set up Daytona for cloud execution
+</Card>
+
+## CLI Reference
+
+### Run Command
+
+```bash
+helios [OPTIONS] TASK_PATH
+```
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--watch` | | Start web viewer with live updates |
+| `--model` | `-m` | Model identifier |
+| `--interactive` | `-i` | Enable pause/resume with 'p' key |
+| `--n-attempts` | `-k` | Number of attempts for pass@k evaluation |
+| `--output` | `-o` | Output directory (default: `output`) |
+| `--provider` | | Environment provider: `docker` or `daytona` |
+
+### Examples
+
+<Tabs>
+  <Tab title="Basic">
+    ```bash
+    # Simple execution
+    helios tasks/create-hello-file
+
+    # With viewer
+    helios tasks/create-hello-file --watch
+    ```
+  </Tab>
+  <Tab title="With Model">
+    ```bash
+    # Claude Sonnet
+    helios tasks/my-task -m claude-sonnet-4-20250514
+
+    # With viewer
+    helios tasks/my-task -m claude-sonnet-4-20250514 --watch
+    ```
+  </Tab>
+  <Tab title="pass@k">
+    ```bash
+    # Run 3 times, pass if any attempt succeeds
+    helios tasks/my-task -k 3
+
+    # Run 5 times with specific model
+    helios tasks/my-task -k 5 -m claude-sonnet-4-20250514
+    ```
+  </Tab>
+  <Tab title="Advanced">
+    ```bash
+    # Full options
+    helios tasks/complex-task \
+      -m bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0 \
+      -o results/run-001/ \
+      --watch \
+      --provider docker
+    ```
+  </Tab>
+</Tabs>
+
+## Understanding Output
+
+### Console Output
+
+```
+Task: create-hello-file
+Model: claude-sonnet-4-20250514
+Provider: docker
+
+[Agent] I'll create the file with the required content.
+[Tool] bash: echo "Hello World" > /home/hello.txt
+[Result] Command executed successfully
+[Agent] The file has been created. Let me verify.
+[Tool] bash: cat /home/hello.txt
+[Result] Hello World
+[Agent] Task completed successfully.
+
+[Verify] Running test.sh...
+[Verify] PASS: File exists with correct content
+
+═══════════════════════════════════════════════════
+  Result: PASS
+  Reward: 1.0
+  Duration: 8.4s
+═══════════════════════════════════════════════════
+```
+
+### Output Files
+
+```
+output/create-hello-file_20250101_120000/
+├── agent/
+│   ├── trajectory.json      # Complete execution trace (ATIF)
+│   └── screenshots/
+│       ├── step_001.png
+│       ├── step_002.png
+│       └── ...
+├── verifier/
+├── config.json
+└── result.json
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Task not found">
+    Ensure the task directory contains both `instruction.md` and `task.toml`.
+
+    ```bash
+    ls tasks/my-task/
+    # Should show: instruction.md task.toml
+    ```
+  </Accordion>
+  <Accordion title="Docker image not found">
+    Build required images first:
+
+    ```bash
+    # For GUI tasks
+    docker build -t cua-desktop -f docker/Dockerfile.desktop .
+
+    # For PDFBench tasks
+    docker build -t pdfbench-base -f docker/Dockerfile.pdfbench .
+    ```
+  </Accordion>
+  <Accordion title="API key errors">
+    Ensure your API keys are set:
+
+    ```bash
+    # Check which key you need
+    echo $GEMINI_API_KEY
+    echo $ANTHROPIC_API_KEY
+    echo $OPENAI_API_KEY
+    ```
+  </Accordion>
+  <Accordion title="Port 8080 in use">
+    The web viewer uses port 8080. If it's in use:
+
+    ```bash
+    # Find what's using the port
+    lsof -i :8080
+
+    # Kill the process or use a different task
+    ```
+  </Accordion>
+  <Accordion title="Agent timeout">
+    Increase the timeout in `task.toml`:
+
+    ```toml
+    [agent]
+    timeout_sec = 300.0  # 5 minutes
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Batch Execution"
+    icon="layer-group"
+    href="/execution/batch-execution"
+  >
+    Run multiple tasks in parallel
+  </Card>
+  <Card
+    title="Web Viewer"
+    icon="eye"
+    href="/execution/web-viewer"
+  >
+    Real-time execution monitoring
+  </Card>
+</CardGroup>

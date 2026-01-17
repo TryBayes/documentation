@@ -1,0 +1,137 @@
+---
+title: Introduction
+description: "Run AI agents in Docker containers with real-time observability"
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Helios Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Helios Hero Dark"
+/>
+
+## What is Helios?
+
+Helios is a **Computer Use Agent Framework** that executes AI agents in isolated Docker containers with real-time viewing capabilities. Agents run tasks defined as simple directories containing instructions and configuration, with results verified programmatically through test scripts.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running with Helios in under 5 minutes
+  </Card>
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/core-concepts"
+  >
+    Understand the architecture and key components
+  </Card>
+  <Card
+    title="Create Tasks"
+    icon="plus"
+    href="/tasks/creating-tasks"
+  >
+    Build your own agent tasks from scratch
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/overview"
+  >
+    Use Helios programmatically in your Python code
+  </Card>
+</CardGroup>
+
+## Why Helios?
+
+<AccordionGroup>
+  <Accordion icon="shield-check" title="Safe Isolation">
+    Every task runs in its own Docker container, providing complete isolation from your host system. Agents can execute arbitrary commands without risk to your environment.
+  </Accordion>
+  <Accordion icon="check-circle" title="Deterministic Verification">
+    Tasks are verified using test scripts that check actual outcomes, not model self-assessment. Know with certainty whether an agent completed its task.
+  </Accordion>
+  <Accordion icon="eye" title="Real-time Observability">
+    Watch agents work in real-time through the web viewer. See every tool call, screenshot, and decision as it happens.
+  </Accordion>
+  <Accordion icon="layer-group" title="Multi-Provider Support">
+    Use any major LLM provider: Anthropic (Claude), OpenAI, Google Gemini, or AWS Bedrock. Switch models with a single flag.
+  </Accordion>
+  <Accordion icon="bolt" title="Parallel Execution">
+    Run hundreds of tasks concurrently with controlled parallelism. Perfect for benchmarks, regression testing, and batch operations.
+  </Accordion>
+  <Accordion icon="cloud" title="Cloud-Native">
+    Deploy to Daytona cloud sandboxes for scalable execution without local Docker dependencies.
+  </Accordion>
+</AccordionGroup>
+
+## Architecture Overview
+
+```
+                    ┌──────────────────────────────────────────────────────┐
+                    │                    AgentRunner                        │
+                    │                                                       │
+                    │   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌──────┐ │
+                    │   │  Task   │──▶│ Gateway │──▶│   Env   │──▶│Verify│ │
+                    │   │ (TOML)  │   │  (LLM)  │   │(Docker) │   │(test)│ │
+                    │   └─────────┘   └─────────┘   └─────────┘   └──────┘ │
+                    │                      │             │                  │
+                    └──────────────────────│─────────────│──────────────────┘
+                                           │             │
+                    ┌──────────────────────│─────────────│──────────────────┐
+                    │                      ▼             ▼                  │
+                    │               ┌───────────┐  ┌──────────┐             │
+                    │               │Web Viewer │  │ Provider │             │
+                    │               │  :8080    │  │Docker/   │             │
+                    │               │           │  │Daytona   │             │
+                    │               └───────────┘  └──────────┘             │
+                    └──────────────────────────────────────────────────────┘
+```
+
+<Steps>
+  <Step title="Define a Task">
+    Create a directory with `instruction.md` (what to do) and `task.toml` (configuration)
+  </Step>
+  <Step title="Run the Agent">
+    Execute with `helios tasks/your-task` - the framework provisions a container and starts the agent
+  </Step>
+  <Step title="Agent Executes">
+    The agent uses tools (bash, computer, editor) to complete the task in the isolated environment
+  </Step>
+  <Step title="Verify Results">
+    The `test.sh` script runs to verify the task was completed correctly
+  </Step>
+</Steps>
+
+## Use Cases
+
+| Use Case | Description |
+|----------|-------------|
+| **Autonomous QA** | Run regression tests with agents that interact with real applications |
+| **Data Extraction** | Scrape websites, process files, and extract structured data |
+| **GUI Automation** | Automate desktop applications through mouse and keyboard |
+| **OS Workflows** | Execute system administration tasks and environment setup |
+| **Research & Benchmarking** | Evaluate agent capabilities on standardized task suites |
+
+## Featured: PDFBench
+
+Helios includes **PDFBench**, a benchmark of 100 PDF form-filling tasks for evaluating computer-use agents. Each task requires the agent to fill out a PDF form based on conversational instructions.
+
+<Card
+  title="Learn about PDFBench"
+  icon="file-pdf"
+  href="/benchmarks/pdfbench"
+>
+  Run the PDFBench benchmark suite on your models
+</Card>
+
+## Getting Started
+
+Ready to run your first agent? Head to the [Quickstart](/quickstart) guide.

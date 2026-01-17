@@ -1,0 +1,335 @@
+---
+title: PDFBench
+description: "100 PDF form-filling tasks for evaluating computer-use agents"
+---
+
+PDFBench is a benchmark suite of 100 PDF form-filling tasks designed to evaluate computer-use agents. Each task requires the agent to fill out a PDF form in Chromium based on conversational instructions.
+
+## Overview
+
+<CardGroup cols={2}>
+  <Card title="100 Tasks" icon="file-pdf">
+    10 form types with 10 variants each
+  </Card>
+  <Card title="Real-World Forms" icon="file-lines">
+    Tax forms, medical forms, legal documents
+  </Card>
+  <Card title="Partial Credit" icon="percent">
+    Granular scoring based on field accuracy
+  </Card>
+  <Card title="Reproducible" icon="rotate">
+    Deterministic verification of filled fields
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Build the PDFBench base image">
+    ```bash
+    docker build -t pdfbench-base -f docker/Dockerfile.pdfbench .
+    ```
+  </Step>
+  <Step title="Run a single task">
+    ```bash
+    helios tasks/pdfbench/pdfbench_eyemed_x001 --watch
+    ```
+  </Step>
+  <Step title="Watch the agent">
+    Open [http://localhost:8080](http://localhost:8080) to see the agent fill out the form.
+  </Step>
+</Steps>
+
+## Form Types
+
+PDFBench includes 10 different form types, each with 10 variations:
+
+| Form Type | Description | Fields |
+|-----------|-------------|--------|
+| `eyemed` | Vision enrollment forms | Personal info, plan selection |
+| `w-9` | IRS W-9 tax forms | TIN, certification, address |
+| `hipaa` | HIPAA authorization forms | Patient info, permissions |
+| `invoice-template` | Invoice templates | Line items, totals, dates |
+| `medical-consent` | Medical consent forms | Procedures, signatures |
+| `medical-plan` | Medical plan enrollment | Coverage options, dependents |
+| `nda` | Non-disclosure agreements | Parties, terms, dates |
+| `rental-lease` | Rental/lease agreements | Property, terms, signatures |
+| `prescription` | Prescription forms | Medication, dosage, patient |
+| `pediatric-immunization` | Pediatric immunization records | Vaccines, dates, provider |
+
+## Task Structure
+
+Each PDFBench task follows this structure:
+
+```
+tasks/pdfbench/
+├── pdfbench_eyemed_x001/
+│   ├── instruction.md         # Conversational form-filling instructions
+│   ├── task.toml              # Task config (gui=true)
+│   ├── environment/
+│   │   ├── Dockerfile         # FROM pdfbench-base + COPY files
+│   │   ├── pdfs/eyemed.pdf    # The PDF form to fill
+│   │   ├── solution.json      # Expected field values
+│   │   └── bbox_verifier.py   # Verification script
+│   └── tests/
+│       └── test.sh            # Runs verification, outputs reward
+└── ... (99 more tasks)
+```
+
+### instruction.md Example
+
+```markdown
+Please fill out the vision enrollment form with the following information:
+
+- Enrollee Name: John Smith
+- Date of Birth: 03/15/1985
+- Social Security Number: 123-45-6789
+- Address: 123 Main Street, Apt 4B, San Francisco, CA 94102
+- Plan Type: Premium Vision
+- Effective Date: 01/01/2025
+
+Sign and date the form.
+```
+
+### solution.json Example
+
+```json
+{
+  "enrollee_name": "John Smith",
+  "dob": "03/15/1985",
+  "ssn": "123-45-6789",
+  "address": "123 Main Street, Apt 4B",
+  "city": "San Francisco",
+  "state": "CA",
+  "zip": "94102",
+  "plan_type": "Premium Vision",
+  "effective_date": "01/01/2025"
+}
+```
+
+## Running the Benchmark
+
+### Full Benchmark
+
+Run all 100 tasks:
+
+```bash
+helios batch tasks/pdfbench/ -n 4 -m claude-sonnet-4-20250514 -o results/pdfbench/
+```
+
+### By Form Type
+
+Run specific form types:
+
+```bash
+# Run all eyemed tasks
+helios batch tasks/pdfbench/ -p "**/pdfbench_eyemed*/task.toml" -n 4
+
+# Run all W-9 tasks
+helios batch tasks/pdfbench/ -p "**/pdfbench_w-9*/task.toml" -n 4
+```
+
+### At Scale with Daytona
+
+For large-scale runs:
+
+```bash
+helios batch tasks/pdfbench/ -n 20 --provider daytona -o results/
+```
+
+## Verification
+
+PDFBench uses a specialized verification system:
+
+<Steps>
+  <Step title="Agent saves the PDF">
+    The agent fills out and saves the PDF form
+  </Step>
+  <Step title="Text extraction">
+    The verifier extracts text from form field bounding boxes
+  </Step>
+  <Step title="Comparison">
+    Extracted values are compared against the solution.json
+  </Step>
+  <Step title="Scoring">
+    Partial credit is awarded based on percentage of correct fields
+  </Step>
+</Steps>
+
+### Scoring
+
+| Score | Meaning |
+|-------|---------|
+| 1.0 | All fields correct |
+| 0.0 | No fields correct |
+| 0.5 | Half the fields correct |
+
+The reward is calculated as:
+```
+reward = correct_fields / total_fields
+```
+
+## Results Analysis
+
+After running the benchmark, analyze results:
+
+```python
+import json
+from pathlib import Path
+
+results_dir = Path("results/pdfbench/")
+results = json.loads((results_dir / "batch_results.json").read_text())
+
+print(f"Total tasks: {results['total_tasks']}")
+print(f"Mean reward: {results['mean_reward']:.3f}")
+print(f"Passed (1.0): {results['passed']}")
+
+# By form type
+form_types = {}
+for task in results['tasks']:
+    form_type = task['name'].split('_')[1]
+    if form_type not in form_types:
+        form_types[form_type] = []
+    form_types[form_type].append(task['reward'])
+
+for form_type, rewards in form_types.items():
+    avg = sum(rewards) / len(rewards)
+    print(f"{form_type}: {avg:.3f}")
+```
+
+## Comparing Models
+
+Run PDFBench with different models:
+
+```bash
+# Claude Sonnet
+helios batch tasks/pdfbench/ -n 4 -m claude-sonnet-4-20250514 -o results/claude-sonnet/
+
+# Claude Opus
+helios batch tasks/pdfbench/ -n 4 -m bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0 -o results/claude-opus/
+
+# Gemini
+helios batch tasks/pdfbench/ -n 4 -m gemini/gemini-2.5-computer-use-preview-10-2025 -o results/gemini/
+
+# OpenAI
+helios batch tasks/pdfbench/ -n 4 -m openai/computer-use-preview -o results/openai/
+```
+
+## Tips for Good Performance
+
+<AccordionGroup>
+  <Accordion title="Use GUI-capable models">
+    PDFBench requires models with strong vision capabilities and computer-use tools.
+  </Accordion>
+  <Accordion title="Allow sufficient time">
+    Form filling takes time. Default timeouts should be sufficient:
+
+    ```toml
+    [agent]
+    timeout_sec = 300.0  # 5 minutes per task
+    ```
+  </Accordion>
+  <Accordion title="Use adequate resources">
+    GUI tasks need more resources:
+
+    ```toml
+    [environment]
+    cpus = 2
+    memory_mb = 4096
+    ```
+  </Accordion>
+  <Accordion title="Watch for common errors">
+    - Clicking wrong fields
+    - Typos in data entry
+    - Missing required fields
+    - Not saving the PDF
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="pdfbench-base image not found">
+    Build the base image first:
+
+    ```bash
+    docker build -t pdfbench-base -f docker/Dockerfile.pdfbench .
+    ```
+  </Accordion>
+  <Accordion title="PDF not opening">
+    The pdfbench-base image includes Chromium. If PDFs don't open, check that the task Dockerfile properly extends pdfbench-base.
+  </Accordion>
+  <Accordion title="Low scores on all tasks">
+    Check that:
+    1. The agent is actually filling out fields
+    2. The PDF is being saved correctly
+    3. Verification is running (check test.sh output)
+  </Accordion>
+  <Accordion title="Verification errors">
+    If verification fails:
+    1. Check that the PDF was saved
+    2. Verify the solution.json matches the PDF fields
+    3. Check bbox_verifier.py for errors
+  </Accordion>
+</AccordionGroup>
+
+## Creating New PDF Tasks
+
+To add your own PDF form-filling tasks:
+
+<Steps>
+  <Step title="Create the task directory">
+    ```bash
+    mkdir -p tasks/pdfbench/pdfbench_myform_x001/{environment,tests}
+    ```
+  </Step>
+  <Step title="Add the PDF">
+    Place your PDF at `environment/pdfs/myform.pdf`
+  </Step>
+  <Step title="Create solution.json">
+    Map field names to expected values:
+
+    ```json
+    {
+      "field_name": "expected_value",
+      "another_field": "another_value"
+    }
+    ```
+  </Step>
+  <Step title="Write instructions">
+    Create `instruction.md` with conversational instructions.
+  </Step>
+  <Step title="Configure task.toml">
+    ```toml
+    version = "1.0"
+
+    [agent]
+    timeout_sec = 300.0
+
+    [environment]
+    docker_image = "pdfbench-base"
+    gui = true
+    cpus = 2
+    memory_mb = 4096
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Batch Execution"
+    icon="layer-group"
+    href="/execution/batch-execution"
+  >
+    Run benchmarks at scale
+  </Card>
+  <Card
+    title="Daytona Cloud"
+    icon="cloud"
+    href="/infrastructure/daytona"
+  >
+    Scale with cloud sandboxes
+  </Card>
+</CardGroup>

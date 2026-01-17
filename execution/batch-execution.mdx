@@ -1,0 +1,441 @@
+---
+title: Batch Execution
+description: "Run multiple tasks in parallel with controlled concurrency"
+---
+
+Helios supports running multiple tasks concurrently, perfect for benchmarks, regression testing, and batch operations.
+
+## Basic Usage
+
+Run all tasks in a directory:
+
+```bash
+helios batch tasks/ -n 4
+```
+
+This discovers all tasks in `tasks/` and runs them with 4 concurrent containers.
+
+## Output
+
+```
+╭─────────────┬─────────────────────────────────────────────────╮
+│ Tasks found │ 10                                              │
+│ Concurrent  │ 4                                               │
+│ Model       │ gemini/gemini-2.5-computer-use-preview-10-2025  │
+│ Output      │ output                                          │
+╰─────────────┴─────────────────────────────────────────────────╯
+
+ 4/10 Passed: 3 | Failed: 1 ━━━━━━━━━━━━━━ 00:45 00:01:30
+
+╭──────────────────── Batch Results ────────────────────╮
+│ Total tasks │ 10                                      │
+│ Passed      │ 8                                       │
+│ Failed      │ 2                                       │
+│ Mean reward │ 0.800                                   │
+│ Duration    │ 180.5s                                  │
+╰───────────────────────────────────────────────────────╯
+```
+
+## Options
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--concurrent` | `-n` | `2` | Number of tasks to run in parallel |
+| `--n-attempts` | `-k` | `1` | Number of attempts per task (for pass@k) |
+| `--model` | `-m` | default | Model to use for all tasks |
+| `--output` | `-o` | `output` | Directory to save all outputs |
+| `--quiet` | `-q` | `false` | Show only aggregate progress |
+| `--pattern` | `-p` | `**/task.toml` | Glob pattern for finding tasks |
+| `--provider` | | `docker` | Environment provider |
+
+## Examples
+
+<Tabs>
+  <Tab title="Basic Batch">
+    ```bash
+    # Run all tasks with 4 concurrent containers
+    helios batch tasks/ -n 4
+    ```
+  </Tab>
+  <Tab title="With Model">
+    ```bash
+    # Use a specific model
+    helios batch tasks/ -n 4 -m claude-sonnet-4-20250514
+    ```
+  </Tab>
+  <Tab title="Custom Output">
+    ```bash
+    # Save results to a specific directory
+    helios batch tasks/ -n 4 -o results/experiment-001/
+    ```
+  </Tab>
+  <Tab title="Quiet Mode">
+    ```bash
+    # Minimal output (just progress bar)
+    helios batch tasks/ -n 4 --quiet
+    ```
+  </Tab>
+  <Tab title="Custom Pattern">
+    ```bash
+    # Find tasks matching a specific pattern
+    helios batch benchmarks/ -p "**/pdfbench*/task.toml" -n 8
+    ```
+  </Tab>
+  <Tab title="Cloud Execution">
+    ```bash
+    # Run on Daytona cloud sandboxes
+    helios batch tasks/ -n 10 --provider daytona
+    ```
+  </Tab>
+  <Tab title="pass@k Evaluation">
+    ```bash
+    # Run each task 3 times (pass@3)
+    helios batch tasks/ -n 4 -k 3
+    ```
+  </Tab>
+</Tabs>
+
+## pass@k Evaluation
+
+The pass@k metric measures whether a task can be solved in k attempts. A task "passes" if **any** of its k attempts succeeds. This is useful for:
+
+- **Benchmarking**: Measure model capability more fairly by accounting for non-determinism
+- **Reliability testing**: Understand how often tasks succeed across multiple runs
+- **Research**: Compare models using standard pass@k metrics
+
+### Basic Usage
+
+```bash
+# Run each task 3 times
+helios batch tasks/ -n 4 -k 3
+```
+
+### Output with pass@k
+
+```
+╭─────────────────────────────────────────────────────────────────────╮
+│   ☀ HELIOS v0.1.0  ·  Batch Mode                                    │
+│                                                                     │
+│   ▸ Tasks        5 discovered                                       │
+│   ▸ Concurrency  4 workers                                          │
+│   ▸ Attempts     3 per task (pass@3)                                │
+│   ▸ Total Runs   15                                                 │
+╰─────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────── Batch Results ────────────────────╮
+│ pass@3: 80.0% (4/5 tasks)                             │
+│ Raw: 10/15 (66.7%)                                    │
+│ Mean reward: 0.667                                    │
+│ Duration: 245.3s                                      │
+╰───────────────────────────────────────────────────────╯
+```
+
+### How pass@k Works
+
+1. **Task Expansion**: Each task is expanded into k separate runs
+2. **Distributed Execution**: Attempts are interleaved across tasks (task1-attempt1, task2-attempt1, task1-attempt2, ...) to spread rate limits
+3. **Result Aggregation**: A task passes if ANY of its k attempts succeeded
+4. **Metrics**: Reports both raw pass rate and pass@k percentage
+
+### Output Structure with pass@k
+
+```
+output/batch_20250112_143022/
+├── batch_summary.json
+├── 000_task-a/
+│   ├── attempt_001/
+│   │   ├── agent/
+│   │   └── verifier/
+│   ├── attempt_002/
+│   │   ├── agent/
+│   │   └── verifier/
+│   └── attempt_003/
+│       ├── agent/
+│       └── verifier/
+├── 001_task-b/
+│   ├── attempt_001/
+│   ├── attempt_002/
+│   └── attempt_003/
+└── ...
+```
+
+### Single Task with pass@k
+
+You can also run a single task multiple times:
+
+```bash
+# Run one task 5 times
+helios run tasks/create-hello-file -k 5
+```
+
+<Note>
+The `-k` option is incompatible with `--watch` and `--interactive` modes since those require a single execution context.
+</Note>
+
+## Concurrency Guidelines
+
+Choose concurrency based on your system resources:
+
+| System | Recommended `-n` |
+|--------|------------------|
+| Laptop (16GB RAM) | 2-4 |
+| Desktop (32GB RAM) | 4-8 |
+| Server (64GB+ RAM) | 8-16 |
+| Cloud (Daytona) | 10-50+ |
+
+<Warning>
+GUI tasks require more resources. For GUI-heavy batches, use lower concurrency (e.g., `-n 2` for GUI tasks vs `-n 8` for headless).
+</Warning>
+
+## Output Structure
+
+Batch runs create organized output:
+
+```
+output/batch_20250101_120000/
+├── batch_summary.json          # Aggregate results
+├── 001_create-hello-file/
+│   ├── agent/
+│   │   └── trajectory.json
+│   ├── verifier/
+│   ├── config.json
+│   └── result.json
+├── 002_web-scraping-task/
+│   ├── agent/
+│   │   └── trajectory.json
+│   ├── verifier/
+│   ├── config.json
+│   └── result.json
+└── 003_gui-browser-task/
+    ├── agent/
+    │   └── trajectory.json
+    ├── verifier/
+    ├── config.json
+    └── result.json
+```
+
+For `-k` runs, each task folder includes `attempt_001/`, `attempt_002/`, etc.
+
+### batch_summary.json
+
+```json
+{
+  "total_tasks": 10,
+  "passed": 8,
+  "failed": 2,
+  "mean_reward": 0.8,
+  "duration_seconds": 180.5,
+  "model": "claude-sonnet-4-20250514",
+  "tasks": [
+    {
+      "name": "create-hello-file",
+      "status": "passed",
+      "reward": 1.0,
+      "duration": 12.3
+    },
+    // ...
+  ]
+}
+```
+
+## Programmatic Usage
+
+Use Helios as a Python library for custom batch workflows:
+
+```python
+import asyncio
+from helios import ParallelRunner, discover_tasks
+
+async def main():
+    # Discover all tasks in a directory
+    task_paths = discover_tasks("tasks/")
+
+    # Create a parallel runner
+    runner = ParallelRunner(
+        task_paths=task_paths,
+        n_concurrent=4,
+        n_attempts=3,  # pass@3 evaluation
+        model="claude-sonnet-4-20250514",
+        output_dir="results/"
+    )
+
+    # Run all tasks
+    result = await runner.run()
+
+    # Access results
+    print(f"Passed: {result.passed}/{result.total_tasks}")
+    print(f"Mean reward: {result.mean_reward:.3f}")
+    print(f"Duration: {result.total_duration_sec:.1f}s")
+
+    # pass@k metrics (when n_attempts > 1)
+    if result.pass_at_k is not None:
+        print(f"pass@{result.n_attempts}: {result.pass_at_k:.1f}%")
+        print(f"Unique tasks: {result.n_unique_tasks}")
+
+    # Iterate over individual results
+    for task_result in result.results:
+        if not task_result.passed:
+            print(f"Failed: {task_result.task_name} (attempt {task_result.attempt})")
+
+asyncio.run(main())
+```
+
+### Custom Task Discovery
+
+```python
+from pathlib import Path
+from helios import ParallelRunner
+
+# Custom task selection
+task_paths = [
+    Path("tasks/easy-task"),
+    Path("tasks/medium-task"),
+    Path("tasks/hard-task"),
+]
+
+runner = ParallelRunner(
+    task_paths=task_paths,
+    n_concurrent=3,
+    model="claude-sonnet-4-20250514"
+)
+```
+
+### Progress Callbacks
+
+```python
+async def on_task_complete(task_name: str, result):
+    print(f"Completed: {task_name} - {result.status}")
+
+runner = ParallelRunner(
+    task_paths=task_paths,
+    n_concurrent=4,
+    on_complete=on_task_complete
+)
+```
+
+## Benchmark Workflows
+
+### Running PDFBench
+
+```bash
+# Build the base image first
+docker build -t pdfbench-base -f docker/Dockerfile.pdfbench .
+
+# Run all 100 PDF tasks
+helios batch tasks/pdfbench/ -n 4 -m claude-sonnet-4-20250514 -o results/pdfbench/
+
+# Run a subset
+helios batch tasks/pdfbench/ -p "**/pdfbench_eyemed*/task.toml" -n 4
+```
+
+### Comparing Models
+
+```bash
+# Run same tasks with different models
+helios batch tasks/benchmark/ -n 4 -m claude-sonnet-4-20250514 -o results/claude-sonnet/
+helios batch tasks/benchmark/ -n 4 -m openai/computer-use-preview -o results/openai/
+helios batch tasks/benchmark/ -n 4 -m gemini/gemini-2.5-computer-use-preview-10-2025 -o results/gemini/
+
+# Compare results
+python compare_results.py results/
+```
+
+### CI/CD Integration
+
+```yaml
+# .github/workflows/benchmark.yml
+name: Run Benchmarks
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Helios
+        run: pip install -e .
+
+      - name: Run Benchmarks
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          helios batch tasks/regression/ -n 4 -o results/
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: results/
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Out of memory">
+    Reduce concurrency or increase system swap:
+
+    ```bash
+    # Lower concurrency
+    helios batch tasks/ -n 2
+    ```
+  </Accordion>
+  <Accordion title="Docker rate limiting">
+    For large batches, Docker Hub may rate limit. Use authenticated pulls:
+
+    ```bash
+    docker login
+    ```
+  </Accordion>
+  <Accordion title="Inconsistent results">
+    Some tasks may be non-deterministic. Use pass@k for fair evaluation:
+
+    ```bash
+    # Recommended: use pass@k to account for non-determinism
+    helios batch tasks/ -n 4 -k 3
+
+    # Alternative: run multiple times and average
+    for i in {1..3}; do
+      helios batch tasks/ -n 4 -o results/run-$i/
+    done
+    ```
+  </Accordion>
+  <Accordion title="Slow task discovery">
+    Use more specific patterns:
+
+    ```bash
+    # Instead of searching everything
+    helios batch . -p "**/task.toml"
+
+    # Be specific
+    helios batch tasks/pdfbench/ -n 4
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Web Viewer"
+    icon="eye"
+    href="/execution/web-viewer"
+  >
+    Monitor execution in real-time
+  </Card>
+  <Card
+    title="PDFBench"
+    icon="file-pdf"
+    href="/benchmarks/pdfbench"
+  >
+    Run the PDF benchmark suite
+  </Card>
+</CardGroup>

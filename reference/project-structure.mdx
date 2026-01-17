@@ -1,0 +1,239 @@
+---
+title: Project Structure
+description: "Helios codebase organization"
+---
+
+Understanding the Helios codebase structure helps with debugging, contributing, and extending the framework.
+
+## Overview
+
+```
+helios/
+├── src/helios/              # Core framework
+├── docker/                  # Docker images
+├── tasks/                   # Example tasks
+├── tests/                   # Unit and integration tests
+└── docs/                    # Documentation
+```
+
+## Source Code (`src/helios/`)
+
+### Entry Points
+
+```
+src/helios/
+├── __init__.py              # Package exports
+├── cli.py                   # CLI entry point (Typer)
+└── ...
+```
+
+**cli.py** - Command-line interface using Typer. Defines `helios`, `helios batch`, and `helios dev` commands.
+
+### Core Runtime
+
+```
+src/helios/
+├── runner.py                # Single task execution
+├── parallel.py              # Batch execution with concurrency
+├── task.py                  # Task loading from directories
+├── config.py                # Configuration defaults
+├── cleanup.py               # Graceful shutdown handling
+├── errors.py                # Exception hierarchy
+├── rate_limit.py            # API rate limiting
+├── trajectory.py            # Execution trace recording
+├── replay.py                # Trajectory replay
+└── ui.py                    # Terminal UI components
+```
+
+**runner.py** - The `AgentRunner` class that orchestrates task execution: load task → provision environment → run agent loop → verify → cleanup.
+
+**parallel.py** - The `ParallelRunner` for concurrent task execution with configurable concurrency and progress tracking.
+
+**task.py** - Loads task definitions from directories. Parses `task.toml` and `instruction.md`.
+
+### Gateway (LLM Providers)
+
+```
+src/helios/gateway/
+├── __init__.py
+├── base.py                  # Abstract BaseGateway
+├── factory.py               # Gateway selection logic
+├── anthropic.py             # Anthropic direct API
+├── gemini.py                # Google Gemini API
+└── openai.py                # OpenAI API
+```
+
+**base.py** - Abstract base class defining the gateway interface.
+
+**factory.py** - Routes model identifiers to appropriate gateway implementations:
+- `gemini/*` → GeminiGateway
+- `claude-*` → AnthropicGateway
+- `bedrock/*` → BedrockGateway (in anthropic.py)
+- `openai/*` → OpenAIGateway
+
+### Environment (Container Management)
+
+```
+src/helios/environment/
+├── __init__.py
+├── base.py                  # Abstract Environment base class
+├── factory.py               # Environment provider selection
+├── docker.py                # Local Docker containers
+├── daytona.py               # Daytona cloud sandboxes
+├── actions.py               # Computer actions (mouse, keyboard)
+└── network.py               # Network configuration
+```
+
+**base.py** - Abstract `Environment` class with methods for container lifecycle, command execution, and screenshots.
+
+**docker.py** - Local Docker implementation using the Docker SDK. Handles container creation, VNC for GUI mode, and cleanup.
+
+**daytona.py** - Daytona cloud sandbox implementation for scalable remote execution.
+
+### Tools
+
+```
+src/helios/tools/
+├── __init__.py
+├── base.py                  # Tool, BaseBashTool, BaseEditorTool
+├── registry.py              # Tool registration
+├── anthropic/               # Anthropic-specific tools
+│   ├── __init__.py
+│   ├── bash.py
+│   ├── computer.py
+│   └── editor.py
+├── gemini/                  # Gemini-specific tools
+│   ├── __init__.py
+│   ├── bash.py
+│   ├── computer.py
+│   └── editor.py
+└── openai/                  # OpenAI-specific tools
+    ├── __init__.py
+    └── computer.py
+```
+
+**base.py** - Base classes for tools:
+- `Tool` - Abstract base for all tools
+- `BaseBashTool` - Shell command execution
+- `BaseEditorTool` - File viewing and editing
+
+Provider-specific implementations handle format differences between LLM APIs.
+
+### Verification
+
+```
+src/helios/verification/
+├── __init__.py
+└── base.py                  # Verifier implementation
+```
+
+**base.py** - Runs `tests/test.sh` inside the container and reads the reward value from `/logs/verifier/reward.txt`.
+
+### Web Server
+
+```
+src/helios/server/
+├── __init__.py
+├── app.py                   # FastAPI application
+├── websocket.py             # WebSocket handlers
+└── helios-viewer/           # Frontend (React)
+```
+
+**app.py** - FastAPI server that serves the web viewer and handles WebSocket connections for real-time updates.
+
+## Docker Images (`docker/`)
+
+```
+docker/
+├── Dockerfile.desktop       # GUI desktop with VNC + Firefox
+└── Dockerfile.pdfbench      # PDFBench base with Chromium
+```
+
+**Dockerfile.desktop** - Ubuntu with Xfce, VNC, and common tools for GUI tasks.
+
+**Dockerfile.pdfbench** - Specialized image for PDF form-filling with Chromium and PDF tools.
+
+## Example Tasks (`tasks/`)
+
+```
+tasks/
+├── create-hello-file/       # Simple file creation
+├── explore-desktop/         # GUI exploration
+├── open-browser-search/     # Browser automation
+└── pdfbench/                # 100 PDF tasks
+    ├── convert_tasks.py
+    └── pdfbench_*/
+```
+
+## Tests (`tests/`)
+
+```
+tests/
+├── conftest.py              # Pytest fixtures
+├── test_task.py             # Task loading tests
+├── test_runner.py           # Runner tests
+├── test_gateway.py          # Gateway tests
+└── integration/             # Integration tests (require Docker)
+```
+
+## Key Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              CLI (cli.py)                               │
+│                                                                         │
+│    helios tasks/my-task  →  runner.py  →  AgentRunner.run()             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Task Loading (task.py)                        │
+│                                                                         │
+│    Load task.toml + instruction.md  →  Task object                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       Gateway Selection (gateway/factory.py)            │
+│                                                                         │
+│    Model identifier  →  AnthropicGateway / GeminiGateway / etc.         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Environment Provisioning (environment/)             │
+│                                                                         │
+│    Docker/Daytona  →  Container  →  VNC (if GUI)                        │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Agent Loop (runner.py)                        │
+│                                                                         │
+│    LLM prompt  →  Tool call  →  Execute  →  Result  →  Screenshot  →...│
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Verification (verification/)                    │
+│                                                                         │
+│    Run test.sh  →  Read reward.txt  →  RunResult                        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Contributing
+
+When contributing to Helios:
+
+1. **Gateway changes** - Add new providers in `src/helios/gateway/`
+2. **Tool changes** - Update base classes in `tools/base.py` and provider implementations
+3. **Environment changes** - Modify `environment/docker.py` or `environment/daytona.py`
+4. **New features** - Start from `cli.py` and trace the data flow
+
+<Card
+  title="Contributing Guide"
+  icon="code-pull-request"
+  href="/development/contributing"
+>
+  Learn how to contribute to Helios
+</Card>

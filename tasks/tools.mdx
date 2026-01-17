@@ -1,0 +1,346 @@
+---
+title: Agent Tools
+description: "Tools available to agents for interacting with the environment"
+---
+
+Agents interact with the environment using three core tools. These are provided to the LLM as callable functions and executed by the Helios framework.
+
+## Overview
+
+| Tool | Availability | Description |
+|------|--------------|-------------|
+| `bash` | All modes | Execute shell commands |
+| `editor` | All modes | View and edit files |
+| `computer` | GUI mode only | Mouse and keyboard interaction |
+
+## bash
+
+The `bash` tool executes shell commands inside the container. This is the primary tool for file operations, package management, and running scripts.
+
+### Capabilities
+
+- Execute any shell command
+- Create, read, update, delete files
+- Install packages
+- Run scripts and programs
+- Chain commands with `&&`, `||`, `;`
+
+### Examples
+
+<Tabs>
+  <Tab title="File Operations">
+    ```bash
+    # Create a file
+    echo "Hello World" > /home/hello.txt
+
+    # Read a file
+    cat /home/hello.txt
+
+    # Create a directory
+    mkdir -p /home/project/src
+
+    # Copy files
+    cp /home/source.txt /home/dest.txt
+
+    # Move/rename files
+    mv /home/old.txt /home/new.txt
+
+    # Delete files
+    rm /home/unwanted.txt
+    ```
+  </Tab>
+  <Tab title="Package Management">
+    ```bash
+    # Ubuntu/Debian
+    apt-get update && apt-get install -y curl jq
+
+    # Python packages
+    pip install requests pandas
+
+    # Node.js packages
+    npm install express
+    ```
+  </Tab>
+  <Tab title="Running Scripts">
+    ```bash
+    # Run a Python script
+    python3 /home/script.py
+
+    # Run a shell script
+    bash /home/setup.sh
+
+    # Run with arguments
+    python3 /home/process.py --input data.csv --output result.json
+    ```
+  </Tab>
+  <Tab title="Chained Commands">
+    ```bash
+    # Run sequentially (stop on failure)
+    mkdir -p /home/app && cd /home/app && npm init -y
+
+    # Run sequentially (continue on failure)
+    rm old.txt; touch new.txt
+
+    # Conditional execution
+    test -f /home/config.json || echo "{}" > /home/config.json
+    ```
+  </Tab>
+</Tabs>
+
+### Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use absolute paths">
+    Always use absolute paths (`/home/file.txt`) rather than relative paths.
+  </Accordion>
+  <Accordion title="Chain related commands">
+    Use `&&` to chain commands that depend on each other.
+  </Accordion>
+  <Accordion title="Suppress interactive prompts">
+    Use flags like `-y` for apt-get to avoid interactive prompts.
+  </Accordion>
+  <Accordion title="Handle errors gracefully">
+    Use `|| true` or proper error handling for commands that might fail.
+  </Accordion>
+</AccordionGroup>
+
+## editor
+
+The `editor` tool provides structured file editing capabilities. It's more reliable than shell commands for complex file modifications.
+
+### Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `view` | View file contents (optionally with line range) |
+| `create` | Create a new file with content |
+| `str_replace` | Replace a string in a file |
+| `insert` | Insert text at a specific line |
+
+### Examples
+
+<Tabs>
+  <Tab title="View">
+    ```python
+    # View entire file
+    editor(command="view", path="/home/script.py")
+
+    # View specific line range
+    editor(command="view", path="/home/script.py", view_range=[1, 50])
+    ```
+  </Tab>
+  <Tab title="Create">
+    ```python
+    # Create a new file
+    editor(
+        command="create",
+        path="/home/hello.py",
+        file_text='''#!/usr/bin/env python3
+print("Hello, World!")
+'''
+    )
+    ```
+  </Tab>
+  <Tab title="Replace">
+    ```python
+    # Replace text in a file
+    editor(
+        command="str_replace",
+        path="/home/config.py",
+        old_str="DEBUG = True",
+        new_str="DEBUG = False"
+    )
+    ```
+  </Tab>
+  <Tab title="Insert">
+    ```python
+    # Insert at a specific line
+    editor(
+        command="insert",
+        path="/home/script.py",
+        insert_line=5,
+        new_str="import logging"
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### When to Use Editor vs Bash
+
+| Scenario | Recommended Tool |
+|----------|-----------------|
+| Create small file | `bash` (echo) |
+| Create multi-line file | `editor` (create) |
+| Simple append | `bash` (>>) |
+| Replace specific text | `editor` (str_replace) |
+| View file contents | `editor` (view) |
+| Complex text manipulation | `editor` |
+
+## computer
+
+The `computer` tool enables GUI interaction through mouse and keyboard actions. Only available when `gui = true` in task.toml.
+
+### Actions
+
+| Action | Parameters | Description |
+|--------|------------|-------------|
+| `left_click` | `coordinate: [x, y]` | Click at position |
+| `right_click` | `coordinate: [x, y]` | Right-click at position |
+| `double_click` | `coordinate: [x, y]` | Double-click at position |
+| `triple_click` | `coordinate: [x, y]` | Triple-click (select line) |
+| `middle_click` | `coordinate: [x, y]` | Middle-click at position |
+| `mouse_move` | `coordinate: [x, y]` | Move mouse to position |
+| `left_click_drag` | `coordinate: [x, y]`, `endCoordinate: [x, y]` | Drag from start to end |
+| `type` | `text: string` | Type text |
+| `key` | `key: string` | Press key |
+| `scroll` | `coordinate: [x, y]`, `direction: "up"/"down"` | Scroll at position |
+| `screenshot` | - | Capture screen |
+
+### Examples
+
+<Tabs>
+  <Tab title="Mouse Actions">
+    ```python
+    # Click a button
+    computer(action="left_click", coordinate=[500, 300])
+
+    # Right-click for context menu
+    computer(action="right_click", coordinate=[500, 300])
+
+    # Double-click to open
+    computer(action="double_click", coordinate=[100, 200])
+
+    # Drag and drop
+    computer(
+        action="left_click_drag",
+        coordinate=[100, 100],
+        endCoordinate=[300, 300]
+    )
+
+    # Scroll down
+    computer(action="scroll", coordinate=[500, 400], direction="down")
+    ```
+  </Tab>
+  <Tab title="Keyboard Actions">
+    ```python
+    # Type text
+    computer(action="type", text="Hello World")
+
+    # Press Enter
+    computer(action="key", key="Return")
+
+    # Keyboard shortcuts
+    computer(action="key", key="ctrl+s")      # Save
+    computer(action="key", key="ctrl+c")      # Copy
+    computer(action="key", key="ctrl+v")      # Paste
+    computer(action="key", key="alt+Tab")     # Switch window
+    computer(action="key", key="ctrl+shift+t") # Complex combo
+
+    # Special keys
+    computer(action="key", key="Tab")
+    computer(action="key", key="Escape")
+    computer(action="key", key="BackSpace")
+    computer(action="key", key="Delete")
+    ```
+  </Tab>
+  <Tab title="Screenshots">
+    ```python
+    # Take a screenshot (returned as base64)
+    computer(action="screenshot")
+    ```
+  </Tab>
+</Tabs>
+
+### Key Names
+
+Common key names for the `key` action:
+
+| Category | Keys |
+|----------|------|
+| **Modifiers** | `ctrl`, `alt`, `shift`, `super` |
+| **Navigation** | `Up`, `Down`, `Left`, `Right`, `Home`, `End`, `Page_Up`, `Page_Down` |
+| **Editing** | `Return`, `Tab`, `BackSpace`, `Delete`, `Escape` |
+| **Function** | `F1` - `F12` |
+
+Combine modifiers with `+`: `ctrl+c`, `ctrl+shift+s`, `alt+F4`
+
+### Coordinate System
+
+Coordinates are in pixels from the top-left corner of the screen:
+- `[0, 0]` = top-left corner
+- `[1920, 1080]` = bottom-right on a 1080p display
+
+<Info>
+The default resolution for GUI tasks is 1024x768. Agents receive screenshots and can calculate coordinates based on visible elements.
+</Info>
+
+### GUI Workflow
+
+A typical GUI interaction pattern:
+
+```python
+# 1. Take a screenshot to see the current state
+computer(action="screenshot")
+
+# 2. Identify target coordinates from the screenshot
+# 3. Perform action
+computer(action="left_click", coordinate=[500, 300])
+
+# 4. Type if needed
+computer(action="type", text="search query")
+
+# 5. Press Enter
+computer(action="key", key="Return")
+
+# 6. Take another screenshot to verify
+computer(action="screenshot")
+```
+
+## Tool Selection Guidelines
+
+<CardGroup cols={2}>
+  <Card title="Use bash when..." icon="terminal">
+    - Installing packages
+    - Running scripts
+    - File system operations
+    - Command-line tools
+    - Non-interactive tasks
+  </Card>
+  <Card title="Use editor when..." icon="pencil">
+    - Creating multi-line files
+    - Precise text replacement
+    - Viewing file contents
+    - Structured code editing
+  </Card>
+  <Card title="Use computer when..." icon="display">
+    - Browser interaction required
+    - Desktop app automation
+    - Visual verification needed
+    - Form filling
+    - GUI-only applications
+  </Card>
+  <Card title="Combine tools when..." icon="layer-group">
+    - Complex workflows
+    - Mixing CLI and GUI
+    - Verifying GUI actions with bash
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Running Tasks"
+    icon="play"
+    href="/execution/running-tasks"
+  >
+    Execute tasks with the CLI
+  </Card>
+  <Card
+    title="Web Viewer"
+    icon="eye"
+    href="/execution/web-viewer"
+  >
+    Watch agents work in real-time
+  </Card>
+</CardGroup>

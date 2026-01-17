@@ -1,0 +1,172 @@
+---
+title: Trajectory Format
+description: "ATIF v1.5 execution traces produced by Helios"
+---
+
+Helios writes execution traces in **ATIF v1.5** format. Each run includes a `trajectory.json` file that captures the full interaction history, tool calls, observations, and metrics.
+
+## File Location
+
+- **Single run:** `output/<task_name>_<timestamp>/agent/trajectory.json`
+- **Batch run:** `output/<batch>/<task>_<timestamp>/agent/trajectory.json` (one per task or attempt)
+
+The `trajectory.json` file is stored alongside `result.json`, verifier logs, and screenshots inside the `agent/` folder for each run.
+
+## Root Object
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `schema_version` | `string` | ✅ | ATIF compatibility, e.g. `ATIF-v1.5`. |
+| `session_id` | `string` | ✅ | Unique identifier for the run. |
+| `agent` | `object` | ✅ | Agent configuration (see Agent object). |
+| `steps` | `array` | ✅ | Ordered list of steps (see Step object). |
+| `notes` | `string` | ❌ | Optional notes or annotations. |
+| `final_metrics` | `object` | ❌ | Aggregate metrics for the run. |
+| `continued_trajectory_ref` | `string` | ❌ | Reference to a continuation file, if used. |
+| `extra` | `object` | ❌ | Helios metadata (see Error Metadata). |
+
+## Agent Object
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | ✅ | Agent system name (e.g., `helios`). |
+| `version` | `string` | ✅ | Agent version identifier. |
+| `model_name` | `string` | ❌ | Default model name for the run. |
+| `tool_definitions` | `array` | ❌ | Tool schema definitions (OpenAI-style function calling). |
+| `extra` | `object` | ❌ | Custom agent metadata. |
+
+## Step Object
+
+Every element in `steps` is a step in the interaction history.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `step_id` | `integer` | ✅ | 1-based sequential index. |
+| `timestamp` | `string` | ❌ | ISO 8601 timestamp. |
+| `source` | `string` | ✅ | One of `system`, `user`, `agent`. |
+| `model_name` | `string` | ❌ | Model used for the step (agent-only). |
+| `reasoning_effort` | `string \| number` | ❌ | Qualitative or numeric effort (agent-only). |
+| `message` | `string` | ✅ | Step text (can be empty). |
+| `reasoning_content` | `string` | ❌ | Explicit reasoning content (agent-only). |
+| `tool_calls` | `array` | ❌ | Tool calls invoked by the agent. |
+| `observation` | `object` | ❌ | Tool or system observations. |
+| `metrics` | `object` | ❌ | LLM metrics for the step (agent-only). |
+| `is_copied_context` | `boolean` | ❌ | Marks copied context steps. |
+| `extra` | `object` | ❌ | Custom step metadata. |
+
+Agent-only fields (`model_name`, `reasoning_effort`, `reasoning_content`, `tool_calls`, `metrics`) must not appear on `system` or `user` steps.
+
+## Tool Calls
+
+Each element in `tool_calls`:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tool_call_id` | `string` | ✅ | Unique tool call ID. |
+| `function_name` | `string` | ✅ | Tool/function name. |
+| `arguments` | `object` | ✅ | JSON arguments (can be `{}`). |
+
+## Observations
+
+`observation.results` is a list of results from tool calls or system events.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `source_call_id` | `string` | ❌ | Tool call ID this result corresponds to. |
+| `content` | `string` | ❌ | Text output or result. |
+| `subagent_trajectory_ref` | `array` | ❌ | References delegated trajectories. |
+
+`subagent_trajectory_ref` entries:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `session_id` | `string` | ✅ | Subagent session ID. |
+| `trajectory_path` | `string` | ❌ | Path or URL to subagent trajectory. |
+| `extra` | `object` | ❌ | Subagent metadata. |
+
+## Metrics Object
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `prompt_tokens` | `integer` | ❌ | Total input tokens (cached + non-cached). |
+| `completion_tokens` | `integer` | ❌ | Total generated tokens. |
+| `cached_tokens` | `integer` | ❌ | Cached tokens within `prompt_tokens`. |
+| `cost_usd` | `number` | ❌ | Monetary cost of the step. |
+| `prompt_token_ids` | `array` | ❌ | Token IDs for prompt tokens. |
+| `completion_token_ids` | `array` | ❌ | Token IDs for completion tokens. |
+| `logprobs` | `array` | ❌ | Log probability per completion token. |
+| `extra` | `object` | ❌ | Provider-specific metrics. |
+
+## Final Metrics
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `total_prompt_tokens` | `integer` | ❌ | Sum of prompt tokens across steps. |
+| `total_completion_tokens` | `integer` | ❌ | Sum of completion tokens across steps. |
+| `total_cached_tokens` | `integer` | ❌ | Sum of cached tokens across steps. |
+| `total_cost_usd` | `number` | ❌ | Total cost for the run. |
+| `total_steps` | `integer` | ❌ | Total step count. |
+| `extra` | `object` | ❌ | Custom aggregate metrics. |
+
+## Error Metadata
+
+Helios does not add custom error fields to the schema. Instead, fatal errors are recorded inside the `extra` objects:
+
+- `steps[].extra.error` contains the structured error for the fatal system step.
+- `extra.error` contains the same structured error at the root for easy access.
+
+Error payload fields follow `helios.errors.CUAError.to_dict()` and include:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `type` | `string` | Error class name. |
+| `code` | `string` | Machine-readable error code. |
+| `message` | `string` | Human-readable error message. |
+| `timestamp` | `string` | ISO 8601 timestamp. |
+| `hint` | `string` | Optional suggestion. |
+| `docs_url` | `string` | Optional documentation link. |
+| `context` | `object` | Optional execution context. |
+| `cause` | `string` | Underlying exception message. |
+| `traceback` | `string` | Full traceback (if captured). |
+
+## Example (Minimal)
+
+```json
+{
+  "schema_version": "ATIF-v1.5",
+  "session_id": "abc123",
+  "agent": {
+    "name": "helios",
+    "version": "1.2.3",
+    "model_name": "gemini/gemini-2.5-computer-use-preview-10-2025"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "source": "user",
+      "message": "Create hello.txt"
+    },
+    {
+      "step_id": 2,
+      "source": "agent",
+      "model_name": "gemini/gemini-2.5-computer-use-preview-10-2025",
+      "message": "Creating the file.",
+      "tool_calls": [
+        {
+          "tool_call_id": "call_1",
+          "function_name": "bash",
+          "arguments": {"command": "echo 'Hello' > hello.txt"}
+        }
+      ],
+      "observation": {
+        "results": [
+          {
+            "source_call_id": "call_1",
+            "content": ""
+          }
+        ]
+      }
+    }
+  ]
+}
+```

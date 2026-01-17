@@ -1,0 +1,278 @@
+---
+title: Daytona Cloud
+description: "Run tasks in scalable cloud sandboxes"
+---
+
+Daytona provides cloud-hosted sandboxes for running Helios tasks without local Docker dependencies. This enables large-scale execution, distributed testing, and CI/CD integration.
+
+## Overview
+
+<CardGroup cols={2}>
+  <Card title="Scalable" icon="chart-line">
+    Run 10, 50, or 100+ tasks concurrently
+  </Card>
+  <Card title="No Local Docker" icon="cloud">
+    Execute from any machine without Docker installed
+  </Card>
+  <Card title="Shareable URLs" icon="link">
+    Share viewer URLs with team members
+  </Card>
+  <Card title="Isolated" icon="shield">
+    Each task runs in its own cloud sandbox
+  </Card>
+</CardGroup>
+
+## Setup
+
+<Steps>
+  <Step title="Get a Daytona API Key">
+    Sign up at [daytona.io](https://daytona.io) and generate an API key.
+  </Step>
+  <Step title="Set the environment variable">
+    ```bash
+    export DAYTONA_API_KEY=your-api-key
+    ```
+
+    Or add to your `.env` file:
+    ```bash
+    # .env
+    DAYTONA_API_KEY=your-api-key
+    ```
+  </Step>
+  <Step title="Install Daytona support">
+    ```bash
+    pip install helios[daytona]
+    # or
+    uv pip install helios[daytona]
+    ```
+  </Step>
+</Steps>
+
+## Usage
+
+### Single Task
+
+```bash
+helios tasks/my-task --provider daytona
+```
+
+### With Web Viewer
+
+```bash
+helios tasks/gui-task --provider daytona --watch
+```
+
+The viewer URL will be a cloud-hosted preview:
+
+```
+Viewer: https://preview.daytona.io/sandbox-abc123/6080?token=xyz789
+```
+
+### Batch Execution
+
+```bash
+helios batch tasks/ -n 20 --provider daytona
+```
+
+Daytona enables much higher concurrency than local Docker:
+
+| Provider | Typical Concurrency |
+|----------|---------------------|
+| Local Docker | 2-8 |
+| Daytona | 10-100+ |
+
+## Cloud Viewer URLs
+
+When using GUI tasks with Daytona, the web viewer is hosted in the cloud:
+
+```bash
+helios tasks/explore-desktop --provider daytona --watch
+```
+
+Output:
+```
+Task: explore-desktop
+Provider: daytona
+
+Provisioning sandbox...
+Sandbox ready: sandbox-abc123
+
+Viewer: https://preview.daytona.io/sandbox-abc123/6080?token=xyz789
+```
+
+**Shareable URLs**: You can share this URL with team members to watch the same execution.
+
+## Comparison: Docker vs Daytona
+
+| Feature | Docker | Daytona |
+|---------|--------|---------|
+| **Setup** | Install Docker locally | API key only |
+| **Concurrency** | Limited by local resources | Cloud-scaled |
+| **GUI Viewer** | localhost:8080 | Shareable cloud URL |
+| **Best for** | Development, testing | Production, CI/CD, benchmarks |
+| **Cost** | Local compute | Daytona pricing |
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Required
+export DAYTONA_API_KEY=your-api-key
+
+# Optional: specify region
+export DAYTONA_REGION=us-east-1
+```
+
+### In .env File
+
+```bash
+# .env
+DAYTONA_API_KEY=your-api-key
+DAYTONA_REGION=us-east-1
+```
+
+## Use Cases
+
+### Large-Scale Benchmarks
+
+Run PDFBench or other benchmarks at scale:
+
+```bash
+# Run all 100 PDF tasks with 20 concurrent sandboxes
+helios batch tasks/pdfbench/ -n 20 --provider daytona -o results/
+```
+
+### CI/CD Integration
+
+```yaml
+# .github/workflows/benchmark.yml
+name: Run Benchmarks
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Helios
+        run: pip install helios[daytona]
+
+      - name: Run Benchmarks
+        env:
+          DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          helios batch tasks/regression/ -n 20 --provider daytona -o results/
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: results/
+```
+
+### Team Collaboration
+
+Share live execution URLs with team members:
+
+```bash
+# Start a task
+helios tasks/complex-task --provider daytona --watch
+
+# Share the URL with your team
+# → https://preview.daytona.io/sandbox-xyz/6080?token=abc
+```
+
+## Programmatic Usage
+
+```python
+from helios import AgentRunner
+from helios.environment import DaytonaEnvironment
+
+async def run_with_daytona():
+    runner = AgentRunner(
+        task_path="tasks/my-task",
+        model="claude-sonnet-4-20250514",
+        environment_provider="daytona"
+    )
+
+    result = await runner.run()
+    print(f"Result: {result.reward}")
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API key not working">
+    Verify your key is correct:
+
+    ```bash
+    echo $DAYTONA_API_KEY
+    ```
+
+    Check it matches your Daytona dashboard.
+  </Accordion>
+  <Accordion title="Sandbox provisioning timeout">
+    Cloud sandboxes take time to provision. If timeouts occur:
+
+    1. Check Daytona status page
+    2. Try a different region
+    3. Reduce concurrency
+  </Accordion>
+  <Accordion title="Viewer URL not accessible">
+    The viewer URL includes a token. Ensure you're using the full URL with the token parameter.
+  </Accordion>
+  <Accordion title="Higher latency than local">
+    Cloud execution has network latency. For development and debugging, use local Docker. Use Daytona for production and benchmarks.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Daytona for production">
+    Local Docker is great for development. Switch to Daytona for:
+    - CI/CD pipelines
+    - Large benchmarks
+    - Team collaboration
+  </Accordion>
+  <Accordion title="Monitor costs">
+    Daytona charges for sandbox usage. Monitor your dashboard and set alerts.
+  </Accordion>
+  <Accordion title="Cache results">
+    Save outputs to avoid re-running expensive tasks:
+
+    ```bash
+    helios batch tasks/ -n 20 --provider daytona -o results/$(date +%Y%m%d)/
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Batch Execution"
+    icon="layer-group"
+    href="/execution/batch-execution"
+  >
+    Run tasks in parallel
+  </Card>
+  <Card
+    title="PDFBench"
+    icon="file-pdf"
+    href="/benchmarks/pdfbench"
+  >
+    Run the PDF benchmark at scale
+  </Card>
+</CardGroup>

@@ -1,0 +1,252 @@
+---
+title: Core Concepts
+description: "Understand the key components and architecture of Helios"
+---
+
+Helios is composed of five core components that work together to execute and verify agent tasks.
+
+## Task
+
+A **Task** is a directory containing everything an agent needs to complete a goal.
+
+```
+my-task/
+├── instruction.md      # Natural language instructions
+├── task.toml           # Configuration (timeouts, resources, Docker image)
+├── environment/        # Optional: custom Dockerfile
+│   └── Dockerfile
+└── tests/              # Verification scripts
+    └── test.sh
+```
+
+<CardGroup cols={2}>
+  <Card title="instruction.md" icon="file-lines">
+    Natural language description of what the agent should accomplish. This becomes part of the agent's prompt.
+  </Card>
+  <Card title="task.toml" icon="file-code">
+    Configuration including Docker image, GUI mode, timeouts, and resource limits.
+  </Card>
+</CardGroup>
+
+<Card
+  title="Learn more about Tasks"
+  icon="arrow-right"
+  href="/tasks/creating-tasks"
+>
+  See how to create and configure tasks
+</Card>
+
+## Gateway
+
+The **Gateway** is the abstraction layer over LLM providers. It routes requests to the appropriate backend based on the model identifier.
+
+| Model Pattern | Provider |
+|--------------|----------|
+| `gemini/*` or contains `gemini` | Google Gemini |
+| `claude-*` | Anthropic Direct |
+| `bedrock/*` or contains `anthropic.` | AWS Bedrock |
+| `openai/*` or `computer-use-preview` | OpenAI |
+
+```bash
+# The gateway automatically routes based on model name
+helios tasks/my-task -m claude-sonnet-4-20250514  # → Anthropic
+helios tasks/my-task -m openai/computer-use-preview  # → OpenAI
+helios tasks/my-task -m gemini/gemini-2.5-computer-use-preview-10-2025  # → Gemini
+```
+
+<Card
+  title="Model Configuration"
+  icon="arrow-right"
+  href="/infrastructure/models"
+>
+  See all supported models and how to configure them
+</Card>
+
+## Environment
+
+The **Environment** provisions isolated containers for agent execution. Helios supports two providers:
+
+<CardGroup cols={2}>
+  <Card title="Docker (Local)" icon="docker">
+    Run containers locally using Docker. Supports headless and GUI modes with VNC.
+  </Card>
+  <Card title="Daytona (Cloud)" icon="cloud">
+    Run in cloud sandboxes for scalable, distributed execution.
+  </Card>
+</CardGroup>
+
+### Execution Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Headless** | No GUI, bash and editor tools only | CLI tasks, scripting, file manipulation |
+| **GUI** | Full desktop with VNC | Browser automation, desktop apps, visual tasks |
+
+<Card
+  title="Environment Configuration"
+  icon="arrow-right"
+  href="/infrastructure/environments"
+>
+  Learn about Docker images, GUI mode, and cloud providers
+</Card>
+
+## Tools
+
+**Tools** are the interfaces agents use to interact with the environment.
+
+<AccordionGroup>
+  <Accordion icon="terminal" title="bash">
+    Execute shell commands inside the container. Available in all modes.
+
+    ```bash
+    # Examples
+    echo "hello" > /home/hello.txt
+    apt-get update && apt-get install -y curl
+    python script.py
+    ```
+  </Accordion>
+  <Accordion icon="pencil" title="editor">
+    Make structured file edits. Useful for multi-line changes where shell commands would be brittle.
+
+    - View file contents
+    - Insert or replace text
+    - Create new files
+  </Accordion>
+  <Accordion icon="display" title="computer">
+    Mouse and keyboard interactions. Only available in GUI mode.
+
+    | Action | Description |
+    |--------|-------------|
+    | `left_click` | Click at coordinates |
+    | `right_click` | Right-click |
+    | `double_click` | Double-click |
+    | `triple_click` | Select line |
+    | `type` | Type text |
+    | `key` | Press key (e.g., `Return`, `ctrl+c`) |
+    | `scroll` | Scroll up/down |
+    | `screenshot` | Capture screen |
+  </Accordion>
+</AccordionGroup>
+
+<Card
+  title="Tools Reference"
+  icon="arrow-right"
+  href="/tasks/tools"
+>
+  Complete tool documentation and examples
+</Card>
+
+## Verifier
+
+The **Verifier** runs `tests/test.sh` inside the container after the agent completes (or times out) and checks the outcome.
+
+### Reward Values
+
+| Value | Meaning |
+|-------|---------|
+| `1` | Pass |
+| `0` | Fail |
+| `0.0-1.0` | Partial credit |
+
+### How It Works
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+# Check if the task was completed
+if [ -f /home/hello.txt ]; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+The verifier writes a reward value to `/logs/verifier/reward.txt`, which Helios reads to determine success or failure.
+
+<Card
+  title="Verification Guide"
+  icon="arrow-right"
+  href="/tasks/verification"
+>
+  Write robust verification scripts
+</Card>
+
+## Web Viewer
+
+The **Web Viewer** provides real-time observability into agent execution.
+
+```bash
+helios tasks/my-task --watch
+# → Open http://localhost:8080
+```
+
+### What You Can See
+
+- **Live VNC view** of the desktop (GUI mode)
+- **Screenshots** at each step
+- **Tool calls** and their outputs
+- **LLM messages** and responses
+- **Verification results**
+
+<Card
+  title="Web Viewer Guide"
+  icon="arrow-right"
+  href="/execution/web-viewer"
+>
+  Learn how to use the web viewer
+</Card>
+
+## Data Flow
+
+Here's how a task execution flows through Helios:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. Load Task                                                            │
+│    instruction.md + task.toml → Task object                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. Provision Environment                                                │
+│    Docker build (if custom) → Container start → GUI/VNC (if enabled)   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. Agent Loop                                                           │
+│    LLM → Tool call → Execute → Screenshot → LLM → ... (until done)     │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. Verification                                                         │
+│    Run test.sh → Read reward.txt → Report result                       │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 5. Cleanup                                                              │
+│    Save trajectory → Stop container → Report final result              │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Create a Task"
+    icon="plus"
+    href="/tasks/creating-tasks"
+  >
+    Build your first task from scratch
+  </Card>
+  <Card
+    title="Run Tasks"
+    icon="play"
+    href="/execution/running-tasks"
+  >
+    Learn all the ways to execute tasks
+  </Card>
+</CardGroup>

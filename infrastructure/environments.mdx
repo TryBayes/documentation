@@ -1,0 +1,355 @@
+---
+title: Environments
+description: "Docker containers and execution environments"
+---
+
+Helios runs tasks in isolated environments. This page covers Docker configuration, image options, and execution modes.
+
+## Environment Providers
+
+| Provider | Description | Use Case |
+|----------|-------------|----------|
+| `docker` | Local Docker containers | Development, testing, small batches |
+| `daytona` | Cloud sandboxes | Large-scale execution, CI/CD |
+
+```bash
+# Local Docker (default)
+helios tasks/my-task --provider docker
+
+# Daytona cloud
+helios tasks/my-task --provider daytona
+```
+
+<Card
+  title="Daytona Setup"
+  icon="cloud"
+  href="/infrastructure/daytona"
+>
+  Configure Daytona for cloud execution
+</Card>
+
+## Execution Modes
+
+### Headless Mode
+
+For CLI/terminal tasks without a graphical interface:
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+gui = false
+```
+
+**Characteristics:**
+- Faster startup
+- Lower resource usage
+- Only `bash` and `editor` tools available
+- No screenshots of desktop
+
+**Good for:**
+- File operations
+- Script execution
+- Package installation
+- API interactions
+
+### GUI Mode
+
+For tasks requiring a graphical desktop:
+
+```toml
+[environment]
+docker_image = "cua-desktop"
+gui = true
+```
+
+**Characteristics:**
+- Full desktop environment (Xfce)
+- VNC for remote viewing
+- All tools available including `computer`
+- Screenshots show the desktop
+
+**Good for:**
+- Browser automation
+- Desktop application control
+- Form filling
+- Visual verification
+
+## Pre-built Images
+
+### ubuntu:22.04
+
+Standard Ubuntu image for headless tasks.
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+```
+
+### cua-desktop
+
+Full desktop environment with VNC.
+
+**Build once:**
+```bash
+docker build -t cua-desktop -f docker/Dockerfile.desktop .
+```
+
+**Use in tasks:**
+```toml
+[environment]
+docker_image = "cua-desktop"
+gui = true
+```
+
+**Included software:**
+- Xfce desktop
+- Firefox browser
+- File manager
+- Terminal
+- Common utilities
+
+### pdfbench-base
+
+Specialized image for PDF form-filling tasks.
+
+**Build once:**
+```bash
+docker build -t pdfbench-base -f docker/Dockerfile.pdfbench .
+```
+
+**Use in tasks:**
+```toml
+[environment]
+docker_image = "pdfbench-base"
+gui = true
+```
+
+**Included software:**
+- Chromium browser
+- PDF viewing tools
+- Python with PDF libraries
+
+## Custom Dockerfiles
+
+Create a custom environment for tasks requiring specific software.
+
+### Structure
+
+```
+my-task/
+├── instruction.md
+├── task.toml
+└── environment/
+    └── Dockerfile
+```
+
+### Configuration
+
+Leave `docker_image` empty to use the custom Dockerfile:
+
+```toml
+[environment]
+docker_image = ""  # Uses environment/Dockerfile
+gui = false
+```
+
+### Example: Python Environment
+
+```dockerfile
+FROM python:3.12-slim
+
+# Install dependencies
+RUN pip install requests pandas numpy matplotlib
+
+# Create working directory
+WORKDIR /home
+```
+
+### Example: Node.js Environment
+
+```dockerfile
+FROM node:20-slim
+
+# Install global packages
+RUN npm install -g typescript ts-node prettier
+
+WORKDIR /home
+```
+
+### Example: Extended Desktop
+
+```dockerfile
+FROM cua-desktop
+
+# Install additional software
+RUN apt-get update && apt-get install -y \
+    gimp \
+    inkscape \
+    libreoffice \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home
+```
+
+### Example: Database Environment
+
+```dockerfile
+FROM ubuntu:22.04
+
+# Install PostgreSQL
+RUN apt-get update && apt-get install -y \
+    postgresql \
+    postgresql-contrib \
+    && rm -rf /var/lib/apt/lists/*
+
+# Start PostgreSQL on container launch
+RUN service postgresql start
+
+WORKDIR /home
+```
+
+## Resource Configuration
+
+Control container resources in `task.toml`:
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+cpus = 2
+memory_mb = 4096
+storage_mb = 20480
+build_timeout_sec = 600.0
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `cpus` | 1 | CPU cores allocated |
+| `memory_mb` | 2048 | Memory in megabytes |
+| `storage_mb` | 10240 | Disk space in megabytes |
+| `build_timeout_sec` | 600 | Docker build timeout |
+
+### Resource Guidelines
+
+| Task Type | CPUs | Memory | Storage |
+|-----------|------|--------|---------|
+| Simple file operations | 1 | 2048 | 10240 |
+| Python/Node scripts | 1 | 2048 | 10240 |
+| GUI desktop | 2 | 4096 | 10240 |
+| Heavy compilation | 2-4 | 4096-8192 | 20480 |
+| Browser automation | 2 | 4096 | 10240 |
+
+## Setup Commands
+
+Run commands before the agent starts:
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+setup_commands = [
+    "apt-get update",
+    "apt-get install -y curl jq python3 python3-pip",
+    "pip3 install requests"
+]
+```
+
+**Use cases:**
+- Install packages
+- Download files
+- Configure services
+- Set environment variables
+
+<Info>
+Setup commands run once when the container starts, before the agent begins execution.
+</Info>
+
+## Network Configuration
+
+By default, containers have:
+- Full internet access
+- No port forwarding to host
+- Container-local ports (e.g., localhost:8000)
+
+For web viewer access, port 8080 is exposed automatically when using `--watch`.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use minimal base images">
+    Smaller images start faster. Use `-slim` variants when possible:
+    - `python:3.12-slim` instead of `python:3.12`
+    - `node:20-slim` instead of `node:20`
+  </Accordion>
+  <Accordion title="Cache custom builds">
+    Custom Dockerfiles are rebuilt for each task run. Keep them simple or pre-build images:
+
+    ```bash
+    # Build once
+    docker build -t my-custom-image -f tasks/my-task/environment/Dockerfile .
+
+    # Reference in task.toml
+    docker_image = "my-custom-image"
+    ```
+  </Accordion>
+  <Accordion title="Use setup_commands for light customization">
+    For simple package installs, use `setup_commands` instead of custom Dockerfiles:
+
+    ```toml
+    setup_commands = ["pip install requests"]
+    ```
+  </Accordion>
+  <Accordion title="Increase build timeout for complex builds">
+    If your Dockerfile takes a long time:
+
+    ```toml
+    build_timeout_sec = 900.0  # 15 minutes
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Docker image not found">
+    Pull the image first or check the image name:
+
+    ```bash
+    docker pull ubuntu:22.04
+    ```
+  </Accordion>
+  <Accordion title="Build fails">
+    Check Dockerfile syntax and ensure base images exist:
+
+    ```bash
+    docker build -t test -f environment/Dockerfile .
+    ```
+  </Accordion>
+  <Accordion title="Out of disk space">
+    Increase `storage_mb` or clean Docker:
+
+    ```bash
+    docker system prune -a
+    ```
+  </Accordion>
+  <Accordion title="Container starts but task fails">
+    Check that required software is installed via setup_commands or Dockerfile.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Model Configuration"
+    icon="brain"
+    href="/infrastructure/models"
+  >
+    Configure LLM providers
+  </Card>
+  <Card
+    title="Daytona Cloud"
+    icon="cloud"
+    href="/infrastructure/daytona"
+  >
+    Run tasks in the cloud
+  </Card>
+</CardGroup>

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Helios",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#F97316",
+    "light": "#FB923C",
+    "dark": "#EA580C",
+    "anchors": {
+      "from": "#F97316",
+      "to": "#DC2626"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/refreshdotdev/helios"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/getting-started"
+  },
+  "tabs": [
+    {
+      "name": "Documentation",
+      "url": "/"
+    },
+    {
+      "name": "API Reference",
+      "url": "/api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/refreshdotdev/helios"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/helios"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "core-concepts"
+      ]
+    },
+    {
+      "group": "Tasks",
+      "pages": [
+        "tasks/creating-tasks",
+        "tasks/task-format",
+        "tasks/verification",
+        "tasks/tools"
+      ]
+    },
+    {
+      "group": "Execution",
+      "pages": [
+        "execution/running-tasks",
+        "execution/batch-execution",
+        "execution/web-viewer"
+      ]
+    },
+    {
+      "group": "Infrastructure",
+      "pages": [
+        "infrastructure/environments",
+        "infrastructure/models",
+        "infrastructure/daytona"
+      ]
+    },
+    {
+      "group": "Benchmarks",
+      "pages": [
+        "benchmarks/pdfbench"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/overview",
+        "api-reference/runner",
+        "api-reference/parallel"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "reference/cli",
+        "reference/configuration",
+        "reference/project-structure"
+      ]
+    },
+    {
+      "group": "Development",
+      "pages": [
+        "development/dev-mode",
+        "development/contributing"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/refreshdotdev/helios",
+    "twitter": "https://twitter.com/refreshdotdev"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
+  "seo": {
+    "indexHiddenPages": false
+  },
+  "openapi": []
+}

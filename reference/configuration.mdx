@@ -1,0 +1,256 @@
+---
+title: Configuration
+description: "Environment variables and settings reference"
+---
+
+Configuration in Helios is managed through environment variables and task.toml files.
+
+## Environment Variables
+
+### LLM Providers
+
+<Tabs>
+  <Tab title="Gemini">
+    ```bash
+    # Either of these works
+    export GEMINI_API_KEY=your-api-key
+    export GOOGLE_API_KEY=your-api-key
+    ```
+  </Tab>
+  <Tab title="Anthropic">
+    ```bash
+    export ANTHROPIC_API_KEY=your-api-key
+    ```
+  </Tab>
+  <Tab title="OpenAI">
+    ```bash
+    export OPENAI_API_KEY=your-api-key
+    ```
+  </Tab>
+  <Tab title="AWS Bedrock">
+    ```bash
+    export AWS_ACCESS_KEY_ID=your-access-key
+    export AWS_SECRET_ACCESS_KEY=your-secret-key
+    export AWS_REGION=us-east-1
+    ```
+  </Tab>
+</Tabs>
+
+### Cloud Providers
+
+```bash
+# Daytona
+export DAYTONA_API_KEY=your-api-key
+```
+
+### Logging
+
+```bash
+# Log level (DEBUG, INFO, WARNING, ERROR)
+export CUA_LOG_LEVEL=INFO
+```
+
+## Using .env Files
+
+Create a `.env` file in your project root:
+
+```bash
+# .env
+GEMINI_API_KEY=your-gemini-key
+ANTHROPIC_API_KEY=your-anthropic-key
+OPENAI_API_KEY=your-openai-key
+AWS_ACCESS_KEY_ID=your-aws-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret
+AWS_REGION=us-east-1
+DAYTONA_API_KEY=your-daytona-key
+CUA_LOG_LEVEL=INFO
+```
+
+<Warning>
+Add `.env` to your `.gitignore` to avoid committing secrets.
+</Warning>
+
+## Default Values
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Model | `gemini/gemini-2.5-computer-use-preview-10-2025` | Default LLM model |
+| Provider | `docker` | Default environment provider |
+| Agent timeout | `120s` | Default agent execution timeout |
+| Verifier timeout | `120s` | Default verification timeout |
+| CPUs | `1` | Default CPU allocation |
+| Memory | `2048 MB` | Default memory allocation |
+| Storage | `10240 MB` | Default storage allocation |
+| Build timeout | `600s` | Default Docker build timeout |
+| Concurrency | `2` | Default batch concurrency |
+
+## Task Configuration (task.toml)
+
+### Complete Reference
+
+```toml
+version = "1.0"
+
+[metadata]
+author_name = "Your Name"
+author_email = "you@example.com"
+difficulty = "easy"              # easy, medium, hard
+category = "programming"
+tags = ["tag1", "tag2"]
+
+[verifier]
+timeout_sec = 120.0              # Verification timeout
+
+[agent]
+timeout_sec = 120.0              # Agent execution timeout
+
+[environment]
+docker_image = "ubuntu:22.04"    # Base Docker image
+gui = false                       # Enable GUI mode
+cpus = 1                          # CPU cores
+memory_mb = 2048                  # Memory in MB
+storage_mb = 10240               # Storage in MB
+build_timeout_sec = 600.0        # Docker build timeout
+setup_commands = [               # Pre-execution commands
+    "apt-get update",
+    "apt-get install -y curl"
+]
+```
+
+### Minimal Configuration
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 120.0
+
+[environment]
+docker_image = "ubuntu:22.04"
+```
+
+### GUI Task Configuration
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+docker_image = "cua-desktop"
+gui = true
+cpus = 2
+memory_mb = 4096
+```
+
+### Custom Dockerfile Configuration
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 180.0
+
+[environment]
+docker_image = ""                 # Empty = use custom Dockerfile
+gui = false
+build_timeout_sec = 900.0        # Longer timeout for complex builds
+```
+
+## Configuration Precedence
+
+1. **CLI flags** - Highest priority
+2. **Environment variables**
+3. **task.toml** - Task-specific settings
+4. **Defaults** - Built-in defaults
+
+Example:
+```bash
+# CLI flag overrides task.toml model setting
+helios tasks/my-task -m claude-sonnet-4-20250514
+```
+
+## Logging
+
+### Log Levels
+
+| Level | Description |
+|-------|-------------|
+| `DEBUG` | Detailed debugging information |
+| `INFO` | General operational messages |
+| `WARNING` | Warning messages |
+| `ERROR` | Error messages only |
+
+### Enabling Debug Logs
+
+```bash
+export CUA_LOG_LEVEL=DEBUG
+helios tasks/my-task
+```
+
+Debug logs include:
+- API requests and responses
+- Tool execution details
+- Container lifecycle events
+- Gateway routing decisions
+
+## Resource Tuning
+
+### For Headless Tasks
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+cpus = 1
+memory_mb = 2048
+```
+
+### For GUI Tasks
+
+```toml
+[environment]
+docker_image = "cua-desktop"
+gui = true
+cpus = 2
+memory_mb = 4096
+```
+
+### For Resource-Intensive Tasks
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+cpus = 4
+memory_mb = 8192
+storage_mb = 20480
+```
+
+## Timeout Guidelines
+
+| Task Type | Recommended Timeout |
+|-----------|---------------------|
+| Simple file operations | 60-120s |
+| Script execution | 120-180s |
+| Package installation | 180-300s |
+| GUI automation | 300-600s |
+| Complex builds | 600-900s |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="CLI Reference"
+    icon="terminal"
+    href="/reference/cli"
+  >
+    Command-line options
+  </Card>
+  <Card
+    title="Task Format"
+    icon="file-code"
+    href="/tasks/task-format"
+  >
+    Complete task.toml reference
+  </Card>
+</CardGroup>

@@ -1,0 +1,428 @@
+---
+title: Creating Tasks
+description: "Build custom tasks for Helios from scratch"
+---
+
+This guide walks you through creating tasks for Helios. A task is a self-contained directory that defines what an agent should accomplish and how to verify success.
+
+## Task Structure
+
+Every task is a directory with the following structure:
+
+```
+my-task/
+├── instruction.md      # What the agent should do
+├── task.toml           # Configuration
+├── environment/        # Optional: custom Docker build
+│   └── Dockerfile
+└── tests/              # Verification scripts
+    └── test.sh
+```
+
+<Info>
+Only `instruction.md` and `task.toml` are required. The `environment/` and `tests/` directories are optional but recommended.
+</Info>
+
+## Quick Start: Create Your First Task
+
+<Steps>
+  <Step title="Create the task directory">
+    ```bash
+    mkdir -p tasks/my-first-task/tests
+    ```
+  </Step>
+  <Step title="Write the instruction">
+    Create `tasks/my-first-task/instruction.md`:
+
+    ```markdown
+    Create a file called greeting.txt in /home with the content "Hello from Helios!"
+    ```
+  </Step>
+  <Step title="Create the configuration">
+    Create `tasks/my-first-task/task.toml`:
+
+    ```toml
+    version = "1.0"
+
+    [metadata]
+    author_name = "Your Name"
+    author_email = "you@example.com"
+    difficulty = "easy"
+    category = "file-creation"
+    tags = ["beginner", "files"]
+
+    [verifier]
+    timeout_sec = 120.0
+
+    [agent]
+    timeout_sec = 120.0
+
+    [environment]
+    docker_image = "ubuntu:22.04"
+    gui = false
+    cpus = 1
+    memory_mb = 2048
+    ```
+  </Step>
+  <Step title="Add verification">
+    Create `tasks/my-first-task/tests/test.sh`:
+
+    ```bash
+    #!/bin/bash
+    mkdir -p /logs/verifier
+
+    if [ -f /home/greeting.txt ] && grep -q "Hello from Helios" /home/greeting.txt; then
+        echo "PASS: File exists with correct content"
+        echo 1 > /logs/verifier/reward.txt
+    else
+        echo "FAIL: File missing or content incorrect"
+        echo 0 > /logs/verifier/reward.txt
+    fi
+    ```
+  </Step>
+  <Step title="Run the task">
+    ```bash
+    helios tasks/my-first-task --watch
+    ```
+  </Step>
+</Steps>
+
+## Task Types
+
+### Headless Tasks (CLI/Terminal)
+
+For tasks that don't require a graphical interface:
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+gui = false
+```
+
+**Example use cases:**
+- Create files and directories
+- Install and configure software
+- Run scripts and process data
+- Interact with APIs
+
+### GUI Tasks (Desktop)
+
+For tasks requiring mouse and keyboard interaction:
+
+<Steps>
+  <Step title="Build the desktop image (once)">
+    ```bash
+    docker build -t cua-desktop -f docker/Dockerfile.desktop .
+    ```
+  </Step>
+  <Step title="Configure the task">
+    ```toml
+    [environment]
+    docker_image = "cua-desktop"
+    gui = true
+    cpus = 2
+    memory_mb = 4096
+    ```
+  </Step>
+</Steps>
+
+**Example use cases:**
+- Browser automation
+- Desktop application interaction
+- Form filling
+- Visual testing
+
+### PDF Form Tasks
+
+For PDF form-filling tasks (part of PDFBench):
+
+<Steps>
+  <Step title="Build the PDFBench base image (once)">
+    ```bash
+    docker build -t pdfbench-base -f docker/Dockerfile.pdfbench .
+    ```
+  </Step>
+  <Step title="Configure the task">
+    ```toml
+    [environment]
+    docker_image = "pdfbench-base"
+    gui = true
+    cpus = 2
+    memory_mb = 4096
+    ```
+  </Step>
+</Steps>
+
+## Custom Dockerfiles
+
+For tasks requiring specific software, create a custom Dockerfile:
+
+```
+my-task/
+├── instruction.md
+├── task.toml
+└── environment/
+    └── Dockerfile
+```
+
+### Example: Python Environment
+
+`environment/Dockerfile`:
+```dockerfile
+FROM python:3.12-slim
+
+RUN pip install requests pandas numpy
+
+WORKDIR /home
+```
+
+`task.toml`:
+```toml
+[environment]
+docker_image = ""  # Leave empty to use custom Dockerfile
+gui = false
+```
+
+### Example: Node.js Environment
+
+`environment/Dockerfile`:
+```dockerfile
+FROM node:20-slim
+
+RUN npm install -g typescript ts-node
+
+WORKDIR /home
+```
+
+### Example: GUI with Additional Tools
+
+`environment/Dockerfile`:
+```dockerfile
+FROM cua-desktop
+
+RUN apt-get update && apt-get install -y \
+    gimp \
+    inkscape \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home
+```
+
+## Writing Good Instructions
+
+### Be Specific and Measurable
+
+<Tabs>
+  <Tab title="Bad">
+    ```markdown
+    Make a website
+    ```
+  </Tab>
+  <Tab title="Good">
+    ```markdown
+    Create an index.html file in /home/www that displays 'Welcome' as an h1
+    heading and includes a paragraph with today's date.
+    ```
+  </Tab>
+</Tabs>
+
+### Include Success Criteria
+
+<Tabs>
+  <Tab title="Bad">
+    ```markdown
+    Set up a database
+    ```
+  </Tab>
+  <Tab title="Good">
+    ```markdown
+    Install PostgreSQL and create a database named 'myapp' with a table
+    'users' containing columns: id (serial primary key), name (varchar 100),
+    email (varchar 255).
+    ```
+  </Tab>
+</Tabs>
+
+### Specify File Paths
+
+<Tabs>
+  <Tab title="Bad">
+    ```markdown
+    Save the output
+    ```
+  </Tab>
+  <Tab title="Good">
+    ```markdown
+    Save the output to /home/results/output.json
+    ```
+  </Tab>
+</Tabs>
+
+## Example Tasks
+
+### Example 1: File Creation (Easy)
+
+<CodeGroup>
+```markdown instruction.md
+Create a file at /home/hello.txt containing exactly "Hello World"
+```
+
+```toml task.toml
+version = "1.0"
+
+[metadata]
+difficulty = "easy"
+category = "file-creation"
+
+[agent]
+timeout_sec = 60.0
+
+[environment]
+docker_image = "ubuntu:22.04"
+```
+
+```bash tests/test.sh
+#!/bin/bash
+mkdir -p /logs/verifier
+
+content=$(cat /home/hello.txt 2>/dev/null)
+if [ "$content" = "Hello World" ]; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+</CodeGroup>
+
+### Example 2: Web Scraping (Medium)
+
+<CodeGroup>
+```markdown instruction.md
+Write a Python script at /home/scraper.py that:
+1. Fetches https://example.com
+2. Extracts the page title
+3. Saves it to /home/title.txt
+```
+
+```toml task.toml
+version = "1.0"
+
+[metadata]
+difficulty = "medium"
+category = "web-scraping"
+
+[agent]
+timeout_sec = 180.0
+
+[environment]
+docker_image = "python:3.12-slim"
+setup_commands = ["pip install requests beautifulsoup4"]
+```
+
+```bash tests/test.sh
+#!/bin/bash
+mkdir -p /logs/verifier
+
+score=0
+
+# Check script exists
+[ -f /home/scraper.py ] && ((score++))
+
+# Check output file exists
+[ -f /home/title.txt ] && ((score++))
+
+# Check output contains expected content
+grep -qi "example domain" /home/title.txt 2>/dev/null && ((score++))
+
+reward=$(echo "scale=2; $score / 3" | bc)
+echo $reward > /logs/verifier/reward.txt
+```
+</CodeGroup>
+
+### Example 3: GUI Browser Task (Hard)
+
+<CodeGroup>
+```markdown instruction.md
+Open Firefox, navigate to https://example.com, and take a screenshot.
+Save the screenshot as /home/screenshot.png
+```
+
+```toml task.toml
+version = "1.0"
+
+[metadata]
+difficulty = "hard"
+category = "gui-automation"
+tags = ["browser", "screenshot"]
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+docker_image = "cua-desktop"
+gui = true
+cpus = 2
+memory_mb = 4096
+```
+
+```bash tests/test.sh
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if [ -f /home/screenshot.png ]; then
+    # Verify it's a valid PNG
+    if file /home/screenshot.png | grep -q "PNG image"; then
+        echo 1 > /logs/verifier/reward.txt
+    else
+        echo 0 > /logs/verifier/reward.txt
+    fi
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Task not found">
+    Ensure your task directory contains both `instruction.md` and `task.toml`.
+  </Accordion>
+  <Accordion title="Verification always fails">
+    1. Test your `test.sh` script manually inside a container
+    2. Check that `/logs/verifier/` directory is created
+    3. Verify the reward file path is exactly `/logs/verifier/reward.txt`
+  </Accordion>
+  <Accordion title="Docker build fails">
+    1. Check your Dockerfile syntax
+    2. Ensure base images exist (`docker pull ubuntu:22.04`)
+    3. Increase `build_timeout_sec` for complex builds
+  </Accordion>
+  <Accordion title="Agent times out">
+    Increase `timeout_sec` in the `[agent]` section, or simplify the task.
+  </Accordion>
+  <Accordion title="GUI not working">
+    1. Ensure `gui = true` in task.toml
+    2. Build the desktop image: `docker build -t cua-desktop -f docker/Dockerfile.desktop .`
+    3. Use `--watch` to see the live view
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Task Format Reference"
+    icon="file-code"
+    href="/tasks/task-format"
+  >
+    Complete task.toml specification
+  </Card>
+  <Card
+    title="Verification Guide"
+    icon="check"
+    href="/tasks/verification"
+  >
+    Write robust verification scripts
+  </Card>
+</CardGroup>

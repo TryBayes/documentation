@@ -1,0 +1,209 @@
+---
+title: Web Viewer
+description: "Real-time monitoring of agent execution"
+---
+
+The Web Viewer provides live observability into agent execution, showing screenshots, tool calls, and LLM interactions as they happen.
+
+## Launching the Viewer
+
+Start any task with `--watch`:
+
+```bash
+helios tasks/explore-desktop --watch
+```
+
+Then open your browser to:
+
+```
+http://localhost:8080
+```
+
+## What You Can See
+
+<CardGroup cols={2}>
+  <Card title="Live Desktop View" icon="display">
+    Real-time VNC streaming of the desktop (GUI tasks)
+  </Card>
+  <Card title="Screenshots" icon="camera">
+    Step-by-step screenshots of agent progress
+  </Card>
+  <Card title="Tool Calls" icon="terminal">
+    Every bash command, editor action, and computer interaction
+  </Card>
+  <Card title="LLM Messages" icon="message">
+    Agent reasoning and responses from the model
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign">
+    Real-time cost monitoring with token counts and per-request costs
+  </Card>
+</CardGroup>
+
+## Viewer Interface
+
+The viewer is organized into panels:
+
+### Desktop/Screenshot Panel
+
+- **GUI tasks**: Live VNC view of the desktop, updated in real-time
+- **Headless tasks**: Latest screenshot (if any)
+
+### Traces Panel
+
+Shows the chronological trace of:
+- Agent messages and reasoning
+- Tool calls with parameters
+- Tool results and outputs
+- Verification status
+
+### LLM Panel
+
+Real-time monitoring of API calls:
+- Per-request costs and token usage
+- Running total cost in the panel header
+- Input/output/cached token breakdown
+- Time to first token (TTFT) metrics
+- Request/response previews
+
+### Status Bar
+
+- Current task name
+- Model being used
+- Elapsed time
+- Pass/Fail status
+
+## VNC Interaction
+
+For GUI tasks, you can interact with the VNC view:
+
+| Action | Description |
+|--------|-------------|
+| **View only** | Watch the agent work |
+| **Click** | Not recommended during execution |
+
+<Warning>
+Manual interaction during agent execution can interfere with the agent's actions. Use view-only mode when watching live runs.
+</Warning>
+
+## Example Session
+
+Starting a GUI task with the viewer:
+
+```bash
+helios tasks/explore-desktop --watch
+```
+
+Output:
+```
+Task: explore-desktop
+Model: gemini/gemini-2.5-computer-use-preview-10-2025
+Provider: docker
+
+Starting web viewer...
+→ Open http://localhost:8080
+
+[Container] Starting cua-desktop...
+[VNC] Desktop ready on :5900
+[Agent] Taking initial screenshot...
+```
+
+The viewer then shows:
+1. Initial desktop screenshot
+2. Agent's plan to explore
+3. Mouse movements and clicks
+4. Application interactions
+5. Final result
+
+## Cloud Viewer URLs
+
+When using Daytona cloud provider, the viewer URL is a cloud-hosted preview:
+
+```bash
+helios tasks/gui-task --watch --provider daytona
+```
+
+Output:
+```
+Viewer: https://preview.daytona.io/sandbox-abc123/6080?token=xyz789
+```
+
+This URL can be shared with others to view the same session.
+
+## Custom Port
+
+If port 8080 is already in use, specify a different port:
+
+```bash
+helios tasks/my-task --watch --port 3000
+```
+
+Then open:
+```
+http://localhost:3000
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    Use the `--port` flag to specify a different port:
+
+    ```bash
+    helios tasks/my-task --watch --port 3000
+    ```
+
+    Or find and stop the conflicting process:
+
+    ```bash
+    # Find what's using the port
+    lsof -i :8080
+
+    # Kill the process
+    kill -9 <PID>
+    ```
+  </Accordion>
+  <Accordion title="Viewer shows blank screen">
+    The container might still be starting. Wait for "Desktop ready" message:
+
+    ```
+    [VNC] Desktop ready on :5900
+    ```
+  </Accordion>
+  <Accordion title="VNC not updating">
+    This can happen with slow network connections. Try refreshing the browser or using a wired connection.
+  </Accordion>
+  <Accordion title="No screenshots in headless mode">
+    Headless tasks don't generate continuous screenshots. You'll see tool calls and text output instead.
+  </Accordion>
+</AccordionGroup>
+
+## Without Web Viewer
+
+If you don't need real-time viewing:
+
+```bash
+# Run without --watch
+helios tasks/my-task
+
+# Screenshots are still saved to output directory
+ls output/my-task/screenshots/
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Running Tasks"
+    icon="play"
+    href="/execution/running-tasks"
+  >
+    CLI execution options
+  </Card>
+  <Card
+    title="Batch Execution"
+    icon="layer-group"
+    href="/execution/batch-execution"
+  >
+    Run multiple tasks in parallel
+  </Card>
+</CardGroup>

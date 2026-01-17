@@ -1,0 +1,328 @@
+---
+title: Task Format
+description: "Complete reference for task.toml configuration"
+---
+
+Tasks are configured using a `task.toml` file in TOML format. This page documents all available configuration options.
+
+## Basic Structure
+
+```toml
+version = "1.0"
+
+[metadata]
+# Optional metadata about the task
+
+[verifier]
+# Verification settings
+
+[agent]
+# Agent execution settings
+
+[environment]
+# Container environment settings
+```
+
+## Configuration Sections
+
+### version
+
+```toml
+version = "1.0"
+```
+
+The configuration format version. Currently always `"1.0"`.
+
+### [metadata]
+
+Optional metadata about the task. Used for organization and documentation.
+
+```toml
+[metadata]
+author_name = "Your Name"
+author_email = "you@example.com"
+difficulty = "easy"          # easy, medium, hard
+category = "programming"
+tags = ["web", "api", "testing"]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `author_name` | string | Task author's name |
+| `author_email` | string | Task author's email |
+| `difficulty` | string | `easy`, `medium`, or `hard` |
+| `category` | string | Task category for organization |
+| `tags` | array | List of tags for filtering |
+
+### [verifier]
+
+Settings for the verification phase.
+
+```toml
+[verifier]
+timeout_sec = 120.0
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `timeout_sec` | float | `120.0` | Maximum time for verification to run |
+
+### [agent]
+
+Settings for agent execution.
+
+```toml
+[agent]
+timeout_sec = 120.0
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `timeout_sec` | float | `120.0` | Maximum time for agent to complete |
+
+### [environment]
+
+Container environment configuration.
+
+```toml
+[environment]
+docker_image = "ubuntu:22.04"
+gui = false
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+build_timeout_sec = 600.0
+setup_commands = [
+    "apt-get update",
+    "apt-get install -y curl"
+]
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `docker_image` | string | `"ubuntu:22.04"` | Base Docker image. Leave empty for custom Dockerfile |
+| `gui` | boolean | `false` | Enable GUI mode with VNC |
+| `cpus` | integer | `1` | CPU allocation |
+| `memory_mb` | integer | `2048` | Memory in MB |
+| `storage_mb` | integer | `10240` | Storage in MB |
+| `build_timeout_sec` | float | `600.0` | Docker build timeout |
+| `setup_commands` | array | `[]` | Commands to run before agent starts |
+
+## Common Configurations
+
+### Headless Task
+
+Minimal configuration for a command-line task:
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 120.0
+
+[environment]
+docker_image = "ubuntu:22.04"
+```
+
+### GUI Desktop Task
+
+Configuration for tasks requiring a graphical interface:
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+docker_image = "cua-desktop"
+gui = true
+cpus = 2
+memory_mb = 4096
+```
+
+<Warning>
+GUI tasks require building the desktop image first:
+```bash
+docker build -t cua-desktop -f docker/Dockerfile.desktop .
+```
+</Warning>
+
+### Python Task
+
+Configuration with Python dependencies:
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 180.0
+
+[environment]
+docker_image = "python:3.12-slim"
+setup_commands = [
+    "pip install requests pandas numpy"
+]
+```
+
+### Node.js Task
+
+Configuration with Node.js:
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 180.0
+
+[environment]
+docker_image = "node:20-slim"
+setup_commands = [
+    "npm install -g typescript"
+]
+```
+
+### Custom Dockerfile Task
+
+When you need a custom environment, leave `docker_image` empty and provide a Dockerfile:
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+docker_image = ""  # Use custom Dockerfile in environment/
+gui = false
+build_timeout_sec = 900.0  # Increase for complex builds
+```
+
+Then create `environment/Dockerfile`:
+
+```dockerfile
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install psycopg2 sqlalchemy
+
+WORKDIR /home
+```
+
+### Long-Running Task
+
+Configuration for tasks that need more time:
+
+```toml
+version = "1.0"
+
+[verifier]
+timeout_sec = 300.0
+
+[agent]
+timeout_sec = 600.0  # 10 minutes
+
+[environment]
+docker_image = "ubuntu:22.04"
+cpus = 2
+memory_mb = 4096
+```
+
+### Resource-Intensive Task
+
+Configuration for tasks needing more resources:
+
+```toml
+version = "1.0"
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+docker_image = "ubuntu:22.04"
+cpus = 4
+memory_mb = 8192
+storage_mb = 20480
+```
+
+## instruction.md
+
+The instruction file contains natural language instructions for the agent. This becomes part of the agent's system prompt.
+
+### Best Practices
+
+<AccordionGroup>
+  <Accordion title="Be specific and measurable">
+    Instead of "make a website", say "create an index.html file at /home/www with an h1 element containing 'Welcome'".
+  </Accordion>
+  <Accordion title="Specify file paths">
+    Always include exact paths where files should be created or modified.
+  </Accordion>
+  <Accordion title="Include success criteria">
+    Describe what success looks like so the agent knows when it's done.
+  </Accordion>
+  <Accordion title="Break down complex tasks">
+    Use numbered steps for multi-part tasks.
+  </Accordion>
+</AccordionGroup>
+
+### Example Instructions
+
+**Simple file creation:**
+```markdown
+Create a file at /home/hello.txt containing exactly "Hello World"
+```
+
+**Multi-step task:**
+```markdown
+1. Create a Python virtual environment at /home/venv
+2. Install the requests library
+3. Write a script at /home/fetch.py that downloads https://example.com
+4. Run the script and save output to /home/output.txt
+```
+
+**GUI task:**
+```markdown
+Open Firefox and navigate to https://example.com.
+Find the main heading on the page and copy its text.
+Save the text to /home/heading.txt
+```
+
+## Directory Structure
+
+Complete task directory structure:
+
+```
+my-task/
+├── instruction.md          # Required: task instructions
+├── task.toml               # Required: configuration
+├── environment/            # Optional: custom Docker build
+│   ├── Dockerfile          # Custom Dockerfile
+│   └── files/              # Files to copy into container
+│       └── config.json
+└── tests/                  # Optional: verification
+    └── test.sh             # Verification script
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Verification"
+    icon="check"
+    href="/tasks/verification"
+  >
+    Learn how to write verification scripts
+  </Card>
+  <Card
+    title="Tools"
+    icon="wrench"
+    href="/tasks/tools"
+  >
+    Understand the tools available to agents
+  </Card>
+</CardGroup>

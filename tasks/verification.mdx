@@ -1,0 +1,366 @@
+---
+title: Verification
+description: "Write robust verification scripts for your tasks"
+---
+
+Verification ensures tasks succeed deterministically, independent of the model's self-assessment. Helios runs your `test.sh` script inside the container after the agent completes and checks the outcome.
+
+## How Verification Works
+
+<Steps>
+  <Step title="Agent completes (or times out)">
+    The agent finishes executing or reaches the timeout limit
+  </Step>
+  <Step title="test.sh runs">
+    Helios executes `tests/test.sh` inside the same container
+  </Step>
+  <Step title="Script writes reward">
+    The script writes a value to `/logs/verifier/reward.txt`
+  </Step>
+  <Step title="Helios reads result">
+    The framework reads the reward and reports the result
+  </Step>
+</Steps>
+
+## Reward Values
+
+| Value | Meaning | Example |
+|-------|---------|---------|
+| `1` | Pass | Task completed successfully |
+| `0` | Fail | Task failed |
+| `0.0-1.0` | Partial credit | 0.67 = 2 of 3 checks passed |
+
+## Basic Template
+
+Every verification script should follow this structure:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+# Your verification logic here
+
+# Write result
+echo [0 or 1 or 0.0-1.0] > /logs/verifier/reward.txt
+```
+
+<Warning>
+Always create the `/logs/verifier` directory first. The script will fail if this directory doesn't exist.
+</Warning>
+
+## Verification Patterns
+
+### File Existence
+
+Check if a file was created:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if [ -f /home/hello.txt ]; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+### File Content
+
+Check if a file contains expected content:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if [ -f /home/hello.txt ] && grep -q "Hello World" /home/hello.txt; then
+    echo "PASS: File contains expected content"
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo "FAIL: File missing or content incorrect"
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+### Exact Content Match
+
+Check for exact file contents:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+content=$(cat /home/hello.txt 2>/dev/null)
+if [ "$content" = "Hello World" ]; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+### Directory Existence
+
+Check if a directory was created:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if [ -d /home/project ]; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+### Command Output
+
+Check the output of a command:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+output=$(python3 /home/script.py 2>&1)
+if [[ "$output" == *"success"* ]]; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+### Service Running
+
+Check if a service is running:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if curl -s http://localhost:8000/health | grep -q "ok"; then
+    echo 1 > /logs/verifier/reward.txt
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+### JSON Validation
+
+Check if a file contains valid JSON with specific fields:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if [ -f /home/data.json ]; then
+    # Check if it's valid JSON and has required fields
+    if jq -e '.name and .email' /home/data.json > /dev/null 2>&1; then
+        echo 1 > /logs/verifier/reward.txt
+    else
+        echo 0 > /logs/verifier/reward.txt
+    fi
+else
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+## Partial Credit
+
+For complex tasks with multiple success criteria, use partial credit:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+score=0
+total=4
+
+# Check 1: File exists
+if [ -f /home/output.txt ]; then
+    ((score++))
+    echo "CHECK 1 PASS: File exists"
+else
+    echo "CHECK 1 FAIL: File missing"
+fi
+
+# Check 2: Contains header
+if grep -q "^# Report" /home/output.txt 2>/dev/null; then
+    ((score++))
+    echo "CHECK 2 PASS: Contains header"
+else
+    echo "CHECK 2 FAIL: Missing header"
+fi
+
+# Check 3: Has at least 10 lines
+if [ "$(wc -l < /home/output.txt 2>/dev/null)" -ge 10 ]; then
+    ((score++))
+    echo "CHECK 3 PASS: Has 10+ lines"
+else
+    echo "CHECK 3 FAIL: Less than 10 lines"
+fi
+
+# Check 4: Ends with summary
+if tail -1 /home/output.txt 2>/dev/null | grep -q "Summary"; then
+    ((score++))
+    echo "CHECK 4 PASS: Ends with summary"
+else
+    echo "CHECK 4 FAIL: Missing summary"
+fi
+
+# Calculate partial credit
+reward=$(echo "scale=2; $score / $total" | bc)
+echo "Score: $score/$total = $reward"
+echo $reward > /logs/verifier/reward.txt
+```
+
+## Advanced Examples
+
+### Python Script Verification
+
+Verify a Python script runs correctly:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+score=0
+total=3
+
+# Check 1: Script exists
+if [ -f /home/calculator.py ]; then
+    ((score++))
+fi
+
+# Check 2: Script is valid Python
+if python3 -m py_compile /home/calculator.py 2>/dev/null; then
+    ((score++))
+fi
+
+# Check 3: Script produces correct output
+expected="15"
+actual=$(python3 /home/calculator.py 5 10 2>/dev/null | tr -d '[:space:]')
+if [ "$actual" = "$expected" ]; then
+    ((score++))
+fi
+
+reward=$(echo "scale=2; $score / $total" | bc)
+echo $reward > /logs/verifier/reward.txt
+```
+
+### Database Verification
+
+Verify database setup:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+score=0
+total=3
+
+# Check 1: Database exists
+if psql -lqt | cut -d \| -f 1 | grep -qw myapp; then
+    ((score++))
+fi
+
+# Check 2: Table exists
+if psql -d myapp -c "\dt" 2>/dev/null | grep -q users; then
+    ((score++))
+fi
+
+# Check 3: Table has correct columns
+if psql -d myapp -c "\d users" 2>/dev/null | grep -q "email"; then
+    ((score++))
+fi
+
+reward=$(echo "scale=2; $score / $total" | bc)
+echo $reward > /logs/verifier/reward.txt
+```
+
+### GUI Screenshot Verification
+
+Verify a screenshot was taken:
+
+```bash
+#!/bin/bash
+mkdir -p /logs/verifier
+
+if [ -f /home/screenshot.png ]; then
+    # Verify it's a valid PNG with minimum size
+    if file /home/screenshot.png | grep -q "PNG image"; then
+        size=$(stat -f%z /home/screenshot.png 2>/dev/null || stat -c%s /home/screenshot.png)
+        if [ "$size" -gt 10000 ]; then
+            echo 1 > /logs/verifier/reward.txt
+        else
+            echo "FAIL: Screenshot too small (likely blank)"
+            echo 0 > /logs/verifier/reward.txt
+        fi
+    else
+        echo "FAIL: Not a valid PNG"
+        echo 0 > /logs/verifier/reward.txt
+    fi
+else
+    echo "FAIL: Screenshot not found"
+    echo 0 > /logs/verifier/reward.txt
+fi
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always create the log directory">
+    Start every script with `mkdir -p /logs/verifier`
+  </Accordion>
+  <Accordion title="Use descriptive output">
+    Print what each check is testing. This helps with debugging.
+  </Accordion>
+  <Accordion title="Handle missing files gracefully">
+    Use `2>/dev/null` to suppress errors when files don't exist.
+  </Accordion>
+  <Accordion title="Test your script manually">
+    Run your verification script in a container before using it with agents.
+  </Accordion>
+  <Accordion title="Use partial credit for complex tasks">
+    Break down verification into multiple checks to get more granular results.
+  </Accordion>
+  <Accordion title="Keep verification deterministic">
+    Avoid timing-dependent checks. If needed, add retries or waits.
+  </Accordion>
+</AccordionGroup>
+
+## Testing Your Verification Script
+
+Before using with an agent, test your script manually:
+
+```bash
+# Start a container with your task's image
+docker run -it ubuntu:22.04 bash
+
+# Manually create the expected output
+echo "Hello World" > /home/hello.txt
+
+# Run your verification script
+bash /path/to/test.sh
+
+# Check the result
+cat /logs/verifier/reward.txt
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Agent Tools"
+    icon="wrench"
+    href="/tasks/tools"
+  >
+    Learn about tools available to agents
+  </Card>
+  <Card
+    title="Running Tasks"
+    icon="play"
+    href="/execution/running-tasks"
+  >
+    Execute your verified tasks
+  </Card>
+</CardGroup>
