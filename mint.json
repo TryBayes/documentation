@@ -15,12 +15,6 @@
       "to": "#DC2626"
     }
   },
-  "topbarLinks": [
-    {
-      "name": "GitHub",
-      "url": "https://github.com/TryBayes/helios"
-    }
-  ],
   "topbarCtaButton": {
     "name": "Get Started",
     "url": "/getting-started"
@@ -33,18 +27,6 @@
     {
       "name": "API Reference",
       "url": "/api-reference"
-    }
-  ],
-  "anchors": [
-    {
-      "name": "GitHub",
-      "icon": "github",
-      "url": "https://github.com/TryBayes/helios"
-    },
-    {
-      "name": "Community",
-      "icon": "discord",
-      "url": "https://discord.gg/helios"
     }
   ],
   "navigation": [
@@ -111,10 +93,6 @@
       ]
     }
   ],
-  "footerSocials": {
-    "github": "https://github.com/TryBayes/helios",
-    "twitter": "https://twitter.com/TryBayes"
-  },
   "feedback": {
     "thumbsRating": true,
     "suggestEdit": true,
