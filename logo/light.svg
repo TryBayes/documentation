@@ -1,11 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40">
-  <defs>
-    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#F97316"/>
-      <stop offset="100%" style="stop-color:#EA580C"/>
-    </linearGradient>
-  </defs>
-  <circle cx="20" cy="20" r="16" fill="url(#gradient)"/>
-  <path d="M14 20 L20 14 L26 20 L20 26 Z" fill="white"/>
-  <text x="44" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="600" fill="#1F2937">Helios</text>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="472"
+     height="463"
+     viewBox="0 0 472 463"
+     fill="none">
+
+  <!-- center dot -->
+  <circle cx="236" cy="231.5" r="46" fill="#D97706"/>
+
+  <!-- inner ring -->
+  <circle cx="236" cy="231.5"
+          r="108"
+          fill="none"
+          stroke="#D97706"
+          stroke-width="22"/>
+
+  <!-- middle ring -->
+  <circle cx="236" cy="231.5"
+          r="160"
+          fill="none"
+          stroke="#D97706"
+          stroke-width="25"/>
+
+  <!-- outer ring: thin, almost closed, gap at 45° -->
+  <circle cx="236" cy="231.5"
+          r="210"
+          fill="none"
+          stroke="#D97706"
+          stroke-width="30"
+          stroke-dasharray="1250 85"
+          transform="rotate(-45 236 231.5)"/>
 </svg>
